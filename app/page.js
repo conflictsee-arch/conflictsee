@@ -1,146 +1,133 @@
-'use client'
-
-import { motion } from 'framer-motion'
+import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import HeroSection from '@/components/HeroSection'
 import StatsBar from '@/components/StatsBar'
 import Footer from '@/components/Footer'
 
-const SECTIONS = [
-  { emoji: '⏱️', title: 'Conflict Timeline',   id: 'timeline',      number: '01', desc: 'Chronological log of all verified and unconfirmed conflict events.' },
-  { emoji: '📊', title: 'Economic Dashboard',  id: 'economics',     number: '02', desc: 'Live oil, gold, currency and market data impacted by the conflict.' },
-  { emoji: '🌍', title: 'World Affairs',       id: 'world-affairs', number: '03', desc: 'Country stances, UN votes, diplomatic shifts and geopolitical impacts.' },
-  { emoji: '🔮', title: 'Rumors & Intel',      id: 'rumors',        number: '04', desc: 'Unverified reports monitored and fact-checked in real time.' },
-]
-
-function SectionDivider() {
-  return (
-    <div style={{
-      height: '1px',
-      background: 'linear-gradient(to right, transparent, #e5e7eb 20%, #e5e7eb 80%, transparent)',
-      margin: '0 32px'
-    }} />
-  )
+export const metadata = {
+  title: 'ConflictSee | Real-time Intelligence',
+  description: 'Live Iran-Israel war intelligence and tracking dashboard.',
 }
 
-export default function HomePage() {
+export default function Home() {
+  const cards = [
+    {
+      id: 'timeline',
+      title: '⏱️ Conflict Timeline',
+      desc: 'Chronological log of all verified and unconfirmed events',
+      link: '/timeline'
+    },
+    {
+      id: 'economics',
+      title: '📊 Economic Dashboard',
+      desc: 'War-impacted asset prices, oil, gold and currency data',
+      link: '/economics'
+    },
+    {
+      id: 'world-affairs',
+      title: '🌍 World Affairs',
+      desc: 'Country positions, UN votes and geopolitical impact scores',
+      link: '/world-affairs'
+    },
+    {
+      id: 'rumors',
+      title: '🔮 Rumors & Intel',
+      desc: 'AI fact-checked rumors and unverified intelligence reports',
+      link: '/rumors'
+    }
+  ]
+
   return (
-    <main style={{ background: 'var(--bg-page)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <>
       <Navbar />
-      
       <HeroSection />
-      
-      <div style={{ maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
-        <StatsBar />
+      <StatsBar />
 
-        <div style={{ padding: '24px 32px 48px', display: 'flex', flexDirection: 'column', gap: '48px' }}>
-          {SECTIONS.map((section, sectionIndex) => (
-            <div key={section.id}>
-              {sectionIndex > 0 && <div style={{ marginBottom: '48px' }}><SectionDivider /></div>}
-              
-              <motion.section
-                id={section.id}
-                initial={{ opacity: 0, y: 40 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                viewport={{ once: true, margin: "-80px" }}
-                style={{
+      <main 
+        className="max-w-[1200px] mx-auto px-8"
+        style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: '0 32px'
+        }}
+      >
+        <section style={{ margin: '64px 0' }}>
+          <h2 style={{
+            fontFamily: 'var(--font-inter), Inter, sans-serif',
+            fontWeight: 700, 
+            fontSize: '28px', 
+            color: '#111827',
+            marginBottom: '32px'
+          }}>
+            Intelligence Sections
+          </h2>
+          
+          <div className="overview-grid" style={{ display: 'grid', gap: '24px' }}>
+            {cards.map(c => (
+              <Link href={c.link} key={c.id} style={{ textDecoration: 'none' }} className="overview-card">
+                <div style={{
                   background: '#ffffff',
-                  borderRadius: '24px',
+                  borderRadius: '20px',
                   border: '1px solid #e5e7eb',
-                  padding: '40px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-              >
-                {/* SECTION NUMBER ANIMATION */}
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                  viewport={{ once: true }}
-                  style={{
-                    fontFamily: 'var(--font-inter), Inter, sans-serif',
-                    fontWeight: 800,
-                    fontSize: '64px',
-                    color: '#f3f4f6',
-                    position: 'absolute',
-                    top: '-12px',
-                    left: '20px',
-                    zIndex: 0,
-                    lineHeight: 1,
-                    userSelect: 'none'
-                  }}
-                >
-                  {section.number}
-                </motion.div>
-
-                {/* Section header */}
-                <div className="section-header" style={{ position: 'relative', zIndex: 1 }}>
-                  <div>
-                    <h2 className="section-title" style={{ fontSize: '24px', marginBottom: '8px' }}>
-                      {section.emoji} {section.title}
-                    </h2>
-                    <p className="section-subtitle" style={{ fontSize: '15px' }}>{section.desc}</p>
-                  </div>
-                  <span style={{
+                  padding: '28px',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer'
+                }}>
+                  <h3 style={{
                     fontFamily: 'var(--font-inter), Inter, sans-serif',
                     fontWeight: 600,
-                    fontSize: '11px',
-                    letterSpacing: '0.8px',
-                    color: '#1a6b3c',
-                    background: '#e8f5ee',
-                    border: '1px solid #4caf7d',
-                    borderRadius: '999px',
-                    padding: '6px 14px',
+                    fontSize: '18px',
+                    color: '#111827',
+                    margin: '0 0 12px 0'
                   }}>
-                    COMING SOON
-                  </span>
+                    {c.title}
+                  </h3>
+                  <p style={{
+                    fontFamily: 'var(--font-inter), Inter, sans-serif',
+                    fontWeight: 400,
+                    fontSize: '14px',
+                    color: '#6b7280',
+                    margin: '0 0 24px 0',
+                    lineHeight: 1.5,
+                    flexGrow: 1
+                  }}>
+                    {c.desc}
+                  </p>
+                  <div style={{
+                    fontFamily: 'var(--font-inter), Inter, sans-serif',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    color: '#1a6b3c'
+                  }}>
+                    View Section →
+                  </div>
                 </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      </main>
 
-                {/* Skeleton placeholder rows */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginTop: '24px', position: 'relative', zIndex: 1 }}>
-                  {[1, 2, 3].map((j, i) => (
-                    <motion.div 
-                      key={j} 
-                      className="skeleton" 
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      transition={{ 
-                        duration: 0.4, 
-                        ease: "easeOut",
-                        delay: i * 0.08
-                      }}
-                      viewport={{ once: true }}
-                      whileHover={{ 
-                        y: -4,
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.10)"
-                      }}
-                      style={{ 
-                        height: '140px', 
-                        borderRadius: '16px',
-                        background: '#f9fafb',
-                        border: '1px solid #f3f4f6'
-                      }} 
-                    />
-                  ))}
-                </div>
-              </motion.section>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <Footer />
-
-      {/* Responsive padding */}
       <style>{`
-        @media (max-width: 768px) {
-          main > div > div { padding: 16px 16px 32px !important; }
-          section { padding: 24px !important; }
+        .overview-grid {
+          grid-template-columns: repeat(4, 1fr);
+        }
+        .overview-card > div:hover {
+          transform: translateY(-4px);
+          border-color: #4caf7d !important;
+          box-shadow: 0 12px 24px rgba(0,0,0,0.06);
+        }
+        @media (max-width: 968px) {
+          .overview-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
+          .overview-grid { grid-template-columns: 1fr; }
         }
       `}</style>
-    </main>
+      <Footer />
+    </>
   )
 }

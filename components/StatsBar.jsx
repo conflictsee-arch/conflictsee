@@ -78,13 +78,13 @@ export default function StatsBar() {
           whileHover={{
             y: -4,
             boxShadow: stat.featured ? '0 12px 32px rgba(26,107,60,0.3)' : '0 8px 24px rgba(0,0,0,0.10)',
-            borderColor: stat.featured ? 'transparent' : '#4caf7d',
+            borderColor: stat.featured ? 'rgba(0,0,0,0)' : '#4caf7d',
             transition: { duration: 0.25, ease: "easeOut" }
           }}
           style={{
             background: stat.featured ? '#1a6b3c' : '#ffffff',
             borderRadius: '16px',
-            border: stat.featured ? '1px solid transparent' : '1px solid #e5e7eb',
+            border: stat.featured ? '1px solid rgba(0,0,0,0)' : '1px solid #e5e7eb',
             padding: '20px',
             boxShadow: stat.featured
               ? '0 4px 16px rgba(26,107,60,0.25)'

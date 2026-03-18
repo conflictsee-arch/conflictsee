@@ -6,8 +6,10 @@ import { ArrowRight } from 'lucide-react'
 
 export default function HeroSection() {
   const [time, setTime] = useState('')
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     const update = () => {
       const now = new Date()
       const ist = new Intl.DateTimeFormat('en-IN', {
@@ -118,12 +120,12 @@ export default function HeroSection() {
               alignItems: 'center',
               gap: '8px',
               transition: 'all 0.2s ease',
-              border: '1px solid transparent'
+              border: '1px solid rgba(0,0,0,0)'
             }}>
               View Live Timeline <ArrowRight size={16} />
             </a>
-            <a href="#economics" className="hero-btn-secondary" style={{
-              backgroundColor: 'transparent',
+            <a href="/economics" className="hero-btn-secondary" style={{
+              backgroundColor: 'rgba(0,0,0,0)',
               border: '1.5px solid #e5e7eb',
               color: '#374151',
               borderRadius: '999px',
@@ -190,7 +192,7 @@ export default function HeroSection() {
             {/* Last updated */}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <span style={{ fontFamily: 'var(--font-space-mono), Space Mono, monospace', fontSize: '11px', color: '#9ca3af' }}>
-                Updated: {time || '--:--:--'} IST
+                Updated: {mounted ? (time || '--:--:--') : '--:--:--'} IST
               </span>
             </div>
           </div>

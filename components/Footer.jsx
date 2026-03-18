@@ -32,8 +32,7 @@ export default function Footer() {
             color: '#6b7280',
             lineHeight: 1.6
           }}>
-            Real-time Iran-Israel war intelligence dashboard.<br/>
-            Design inspiration from <a href="https://www.knodal.ai/" target="_blank" rel="noreferrer" style={{color: '#1a6b3c', textDecoration: 'underline'}}>knodal.ai</a>
+            Real-time Iran-Israel war intelligence dashboard.
           </p>
         </div>
 

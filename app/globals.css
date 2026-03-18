@@ -212,3 +212,15 @@ body {
 .mono {
   font-family: var(--font-space-mono), 'Space Mono', monospace;
 }
+
+/* =====================
+   DIVIDER
+   ===================== */
+.divider {
+  height: 1px;
+  background: linear-gradient(
+    to right, transparent, 
+    #e5e7eb 20%, #e5e7eb 80%, transparent
+  );
+  margin: 16px 0 48px;
+}

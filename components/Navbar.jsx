@@ -2,21 +2,27 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowUpRight, Menu, X } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { Menu, X } from 'lucide-react'
 
 const NAV_LINKS = [
-  { label: 'Timeline',     href: '#timeline' },
-  { label: 'Economics',    href: '#economics' },
-  { label: 'World Affairs',href: '#world-affairs' },
-  { label: 'Rumors',       href: '#rumors' },
-  { label: 'Ask AI',       href: '#ask-ai' },
+  { label: 'Timeline',     href: '/timeline' },
+  { label: 'Economics',    href: '/economics' },
+  { label: 'World Affairs',href: '/world-affairs' },
+  { label: 'Rumors',       href: '/rumors' },
+  { label: 'Ask AI',       href: '/ask-ai' },
 ]
 
 export default function Navbar() {
-  const [active, setActive] = useState('Timeline')
+  const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [time, setTime] = useState('')
   const [scrolled, setScrolled] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -46,6 +52,8 @@ export default function Navbar() {
     return () => { document.body.style.overflow = '' }
   }, [mobileOpen])
 
+  if (!mounted) return null
+
   return (
     <>
       {/* ── NAVBAR ─────────────────────────── */}
@@ -68,28 +76,30 @@ export default function Navbar() {
 
         {/* LEFT — Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-          <div style={{
-            width: '36px', height: '36px',
-            background: '#1a6b3c',
-            borderRadius: '10px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
+          <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '36px', height: '36px',
+              background: '#1a6b3c',
+              borderRadius: '10px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <span style={{
+                color: '#ffffff',
+                fontFamily: 'var(--font-inter), Inter, sans-serif',
+                fontWeight: 700,
+                fontSize: '13px',
+                letterSpacing: '0.5px',
+              }}>CS</span>
+            </div>
             <span style={{
-              color: '#ffffff',
               fontFamily: 'var(--font-inter), Inter, sans-serif',
               fontWeight: 700,
-              fontSize: '13px',
-              letterSpacing: '0.5px',
-            }}>CS</span>
-          </div>
-          <span style={{
-            fontFamily: 'var(--font-inter), Inter, sans-serif',
-            fontWeight: 700,
-            fontSize: '18px',
-            color: '#1a6b3c',
-            letterSpacing: '-0.3px',
-          }}>ConflictSee</span>
+              fontSize: '18px',
+              color: '#1a6b3c',
+              letterSpacing: '-0.3px',
+            }}>ConflictSee</span>
+          </Link>
         </div>
 
         {/* CENTER — Nav links (desktop only) */}
@@ -98,28 +108,30 @@ export default function Navbar() {
           alignItems: 'center',
           gap: '24px',
         }}>
-          {NAV_LINKS.map(link => (
-            <a
-              key={link.label}
-              href={link.href}
-              className={`nav-link ${active === link.label ? 'active' : ''}`}
-              onClick={() => setActive(link.label)}
-              style={{
-                fontFamily: 'var(--font-inter), Inter, sans-serif',
-                fontWeight: 500,
-                fontSize: '14px',
-                color: active === link.label ? '#1a6b3c' : '#6b7280',
-                textDecoration: 'none',
-                padding: '10px 0',
-                transition: 'color 0.2s',
-                lineHeight: 1,
-                whiteSpace: 'nowrap',
-                position: 'relative',
-              }}
-            >
-              {link.label}
-            </a>
-          ))}
+          {NAV_LINKS.map(link => {
+            const isActive = pathname === link.href || (pathname === '/' && link.href === '/')
+            return (
+              <Link
+                key={link.label}
+                href={link.href}
+                className={`nav-link ${isActive ? 'active' : ''}`}
+                style={{
+                  fontFamily: 'var(--font-inter), Inter, sans-serif',
+                  fontWeight: 500,
+                  fontSize: '14px',
+                  color: isActive ? '#1a6b3c' : '#6b7280',
+                  textDecoration: 'none',
+                  padding: '10px 0',
+                  transition: 'color 0.2s',
+                  lineHeight: 1,
+                  whiteSpace: 'nowrap',
+                  position: 'relative',
+                }}
+              >
+                {link.label}
+              </Link>
+            )
+          })}
         </div>
 
         {/* RIGHT — LIVE + DAY badge + hamburger */}
@@ -234,28 +246,31 @@ export default function Navbar() {
             <span style={{ fontWeight: 700, fontSize: '22px', color: '#1a6b3c' }}>ConflictSee</span>
           </div>
 
-          {NAV_LINKS.map(link => (
-            <a
-              key={link.label}
-              href={link.href}
-              onClick={() => { setActive(link.label); setMobileOpen(false) }}
-              style={{
-                fontFamily: 'var(--font-inter), Inter, sans-serif',
-                fontWeight: 600,
-                fontSize: '20px',
-                color: active === link.label ? '#1a6b3c' : '#374151',
-                textDecoration: 'none',
-                padding: '12px 40px',
-                borderRadius: '12px',
-                background: active === link.label ? '#e8f5ee' : 'transparent',
-                width: '100%',
-                textAlign: 'center',
-                transition: 'all 0.15s',
-              }}
-            >
-              {link.label}
-            </a>
-          ))}
+          {NAV_LINKS.map(link => {
+            const isActive = pathname === link.href || (pathname === '/' && link.href === '/')
+            return (
+              <Link
+                key={link.label}
+                href={link.href}
+                onClick={() => setMobileOpen(false)}
+                style={{
+                  fontFamily: 'var(--font-inter), Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '20px',
+                  color: isActive ? '#1a6b3c' : '#374151',
+                  textDecoration: 'none',
+                  padding: '12px 40px',
+                  borderRadius: '12px',
+                  background: isActive ? '#e8f5ee' : 'rgba(0,0,0,0)',
+                  width: '100%',
+                  textAlign: 'center',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {link.label}
+              </Link>
+            )
+          })}
         </div>
       )}
 
