@@ -63,12 +63,7 @@ function AnimatedCounter({ to }) {
 
 export default function StatsBar() {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(4, 1fr)',
-      gap: '16px',
-      margin: '24px 32px',
-    }}>
+    <div className="statsbar-grid">
       {STATS.map((stat, i) => (
         <motion.div
           key={stat.label}
@@ -77,8 +72,9 @@ export default function StatsBar() {
           transition={{ duration: 0.5, delay: 1 + (i * 0.1), ease: "easeOut" }}
           whileHover={{
             y: -4,
-            boxShadow: stat.featured ? '0 12px 32px rgba(26,107,60,0.3)' : '0 8px 24px rgba(0,0,0,0.10)',
-            borderColor: stat.featured ? 'rgba(0,0,0,0)' : '#4caf7d',
+            boxShadow: stat.featured
+              ? '0 12px 32px rgba(26,107,60,0.3)'
+              : '0 8px 24px rgba(0,0,0,0.10), inset 0 0 0 1px #4caf7d',
             transition: { duration: 0.25, ease: "easeOut" }
           }}
           style={{
@@ -140,20 +136,6 @@ export default function StatsBar() {
         </motion.div>
       ))}
 
-      {/* Responsive grid */}
-      <style>{`
-        @media (max-width: 900px) {
-          div[style*="repeat(4"] {
-            grid-template-columns: repeat(2, 1fr) !important;
-          }
-        }
-        @media (max-width: 520px) {
-          div[style*="repeat(4"] {
-            grid-template-columns: 1fr !important;
-            margin: 16px 16px !important;
-          }
-        }
-      `}</style>
     </div>
   )
 }

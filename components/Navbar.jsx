@@ -52,8 +52,6 @@ export default function Navbar() {
     return () => { document.body.style.overflow = '' }
   }, [mobileOpen])
 
-  if (!mounted) return null
-
   return (
     <>
       {/* ── NAVBAR ─────────────────────────── */}
@@ -109,24 +107,13 @@ export default function Navbar() {
           gap: '24px',
         }}>
           {NAV_LINKS.map(link => {
-            const isActive = pathname === link.href || (pathname === '/' && link.href === '/')
+            const isActive = mounted && pathname === link.href
             return (
               <Link
                 key={link.label}
                 href={link.href}
                 className={`nav-link ${isActive ? 'active' : ''}`}
-                style={{
-                  fontFamily: 'var(--font-inter), Inter, sans-serif',
-                  fontWeight: 500,
-                  fontSize: '14px',
-                  color: isActive ? '#1a6b3c' : '#6b7280',
-                  textDecoration: 'none',
-                  padding: '10px 0',
-                  transition: 'color 0.2s',
-                  lineHeight: 1,
-                  whiteSpace: 'nowrap',
-                  position: 'relative',
-                }}
+                style={{ whiteSpace: 'nowrap' }}
               >
                 {link.label}
               </Link>
@@ -274,34 +261,7 @@ export default function Navbar() {
         </div>
       )}
 
-      {/* ── RESPONSIVE STYLES ────────────────── */}
-      <style>{`
-        .nav-link::after {
-          content: '';
-          position: absolute;
-          bottom: 0px;
-          left: 0;
-          width: 100%;
-          height: 2px;
-          background-color: #1a6b3c;
-          transform: scaleX(0);
-          transform-origin: left;
-          transition: transform 0.2s ease;
-        }
-        .nav-link:hover {
-          color: #1a6b3c !important;
-        }
-        .nav-link:hover::after {
-          transform: scaleX(1);
-        }
-        .nav-link.active::after {
-          transform: scaleX(1);
-        }
-        @media (max-width: 768px) {
-          .desktop-nav { display: none !important; }
-          .hamburger-btn { display: flex !important; }
-        }
-      `}</style>
+
     </>
   )
 }

@@ -108,7 +108,7 @@ export default function EconomicsSection() {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: "easeOut", delay: index * 0.1 }}
                 viewport={{ once: true }}
-                whileHover={{ y: -4, boxShadow: "0 8px 24px rgba(0,0,0,0.10)", borderColor: "#4caf7d" }}
+                whileHover={{ y: -4, boxShadow: "0 8px 24px rgba(0,0,0,0.10), inset 0 0 0 1px #4caf7d" }}
                 style={{
                   background: '#ffffff',
                   borderRadius: '20px',

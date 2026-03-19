@@ -16,13 +16,15 @@ const spaceMono = Space_Mono({
 })
 
 export const metadata = {
-  title: 'ConflictSee — Real-Time Iran-Israel War Intelligence Dashboard',
-  description:
-    'ConflictSee is a real-time intelligence dashboard tracking the Iran-Israel conflict — timeline, economics, world affairs, and rumors.',
-  keywords: 'Iran Israel war, conflict tracker, intelligence dashboard, real-time news',
+  title: 'ConflictSee',
+  description: 'Real-time Iran-Israel war intelligence dashboard',
+  metadataBase: new URL('https://conflictsee.vercel.app'),
+  icons: {
+    icon: '/favicon.svg',
+  },
   openGraph: {
     title: 'ConflictSee',
-    description: 'Real-time Iran-Israel War Intelligence Dashboard',
+    description: 'Real-time Iran-Israel war intelligence dashboard',
     type: 'website',
   },
 }
@@ -31,7 +33,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} ${spaceMono.variable}`}>
       <body style={{ fontFamily: 'var(--font-inter), Inter, sans-serif' }}>
-        {children}
+        <main style={{ minHeight: '100vh', background: '#ffffff' }}>
+          {children}
+        </main>
       </body>
     </html>
   )

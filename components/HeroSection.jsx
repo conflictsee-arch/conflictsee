@@ -200,35 +200,6 @@ export default function HeroSection() {
 
       </div>
 
-      <style>{`
-        .hero-btn-primary:hover {
-          background-color: #2d9e5f !important;
-          transform: scale(1.02);
-        }
-        .hero-btn-secondary:hover {
-          border-color: #1a6b3c !important;
-          color: #1a6b3c !important;
-        }
-        .hero-stats-card:hover {
-          box-shadow: 0 12px 40px rgba(0,0,0,0.12) !important;
-          transform: translateY(-4px);
-        }
-
-        /* 60/40 gap desktop, stack mobile */
-        .hero-container {
-          gap: 64px;
-        }
-        @media (max-width: 968px) {
-          .hero-container {
-            flex-direction: column;
-            gap: 40px;
-          }
-          .hero-left, .hero-right {
-            flex: 1 1 100% !important;
-            width: 100%;
-          }
-        }
-      `}</style>
     </section>
   )
 }
