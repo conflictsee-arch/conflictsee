@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/fetch-timeline",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/process-news?type=economics",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/process-news?type=world_affairs",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/process-news?type=rumors",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}

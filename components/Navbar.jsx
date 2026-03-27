@@ -10,7 +10,6 @@ const NAV_LINKS = [
   { label: 'Economics',    href: '/economics' },
   { label: 'World Affairs',href: '/world-affairs' },
   { label: 'Rumors',       href: '/rumors' },
-  { label: 'Ask AI',       href: '/ask-ai' },
 ]
 
 export default function Navbar() {
@@ -22,6 +21,16 @@ export default function Navbar() {
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  // Dynamic war day count (Feb 28, 2026 = Day 1)
+  const [dayCount, setDayCount] = useState(28) // Safe server default
+  useEffect(() => {
+    const warStart = new Date('2026-02-28T00:00:00Z')
+    const now = new Date()
+    const d = Math.floor((now - warStart) / (1000 * 60 * 60 * 24)) + 1
+    const finalDay = d > 0 ? d : 1
+    setDayCount(finalDay)
   }, [])
 
   useEffect(() => {
@@ -134,7 +143,7 @@ export default function Navbar() {
             }}>LIVE</span>
           </div>
 
-          {/* DAY 18 pill */}
+          {/* DAY pill */}
           <span style={{
             background: '#e8f5ee',
             color: '#1a6b3c',
@@ -144,7 +153,7 @@ export default function Navbar() {
             fontWeight: 600,
             fontSize: '12px',
             border: '1px solid #4caf7d',
-          }}>DAY 18</span>
+          }}>DAY {dayCount}</span>
 
           {/* Hamburger — mobile only */}
           <button
@@ -185,8 +194,8 @@ export default function Navbar() {
           overflow: 'hidden',
           textOverflow: 'ellipsis',
         }}>
-          ⚠️ CONFLICT ACTIVE — DAY 18 &nbsp;|&nbsp; Iran-Israel War &nbsp;|&nbsp; ConflictSee &nbsp;|&nbsp;
-          Last Updated: <span style={{ fontFamily: 'var(--font-space-mono), Space Mono, monospace' }}>{time}</span> IST &nbsp;|&nbsp; 🔄 Auto-refresh: ON
+          ⚠️ CONFLICT ACTIVE — DAY {dayCount} &nbsp;|&nbsp; Iran-Israel War &nbsp;|&nbsp; ConflictSee &nbsp;|&nbsp;
+          Last Updated: <span style={{ fontFamily: 'var(--font-space-mono), Space Mono, monospace' }}>{mounted ? time : '--:--:--'}</span> IST &nbsp;|&nbsp; 🔄 Auto-refresh: ON
         </span>
       </div>
 

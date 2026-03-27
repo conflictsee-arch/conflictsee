@@ -8,15 +8,22 @@ export default function HeroSection() {
   const [time, setTime] = useState('')
   const [mounted, setMounted] = useState(false)
 
+  const [dayCount, setDayCount] = useState(28) // Safe server default
   useEffect(() => {
     setMounted(true)
+    const warStart = new Date('2026-02-28T00:00:00Z')
     const update = () => {
       const now = new Date()
+      // Time update
       const ist = new Intl.DateTimeFormat('en-IN', {
         hour: '2-digit', minute: '2-digit', second: '2-digit',
         hour12: false, timeZone: 'Asia/Kolkata',
       }).format(now)
       setTime(ist)
+
+      // Day update
+      const d = Math.floor((now - warStart) / (1000 * 60 * 60 * 24)) + 1
+      setDayCount(d > 0 ? d : 1)
     }
     update()
     const id = setInterval(update, 1000)
@@ -60,7 +67,7 @@ export default function HeroSection() {
               marginBottom: '24px'
             }}
           >
-            🔴 LIVE COVERAGE — DAY 18
+            🔴 LIVE COVERAGE — DAY {dayCount}
           </motion.div>
 
           {/* Headline */}
@@ -171,7 +178,7 @@ export default function HeroSection() {
             {/* 4 stat rows */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
               {[
-                { label: 'Conflict Day', value: '18' },
+                { label: 'Conflict Day', value: dayCount.toString() },
                 { label: 'Events Logged', value: '247+' },
                 { label: 'Countries Watch', value: '43' },
                 { label: 'Active Rumors', value: '12' },

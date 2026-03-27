@@ -76,11 +76,6 @@ export default function Footer() {
         </div>
       </div>
 
-      <style>{`
-        .footer-link:hover {
-          color: #1a6b3c !important;
-        }
-      `}</style>
     </footer>
   )
 }

@@ -31,8 +31,8 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${inter.variable} ${spaceMono.variable}`}>
-      <body style={{ fontFamily: 'var(--font-inter), Inter, sans-serif' }}>
+    <html lang="en" className={`${inter.variable} ${spaceMono.variable}`} suppressHydrationWarning>
+      <body style={{ fontFamily: 'var(--font-inter), Inter, sans-serif' }} suppressHydrationWarning>
         <main style={{ minHeight: '100vh', background: '#ffffff' }}>
           {children}
         </main>

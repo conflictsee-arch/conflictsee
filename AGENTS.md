@@ -138,3 +138,9 @@ c:\code\Conflictsee\
 - NO credibility score 0–100%
 - NO community voting
 - NO upvote/downvote buttons
+
+## Deployment Rules (CRITICAL)
+1. **NEVER push to GitHub automatically.** Only push when explicitly commanded with "push to git" or "push to github".
+2. **NEVER deploy to Vercel.** The user handles all deployments manually.
+3. When commanded to push, exactly execute: `git add .`, `git commit -m "description"`, `git push`.
+4. For all other tasks: make changes locally, run `npm run dev` to test, and wait for instructions.

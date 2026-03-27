@@ -62,7 +62,7 @@ export default function Home() {
             Intelligence Sections
           </h2>
           
-          <div className="overview-grid" style={{ display: 'grid', gap: '24px' }}>
+          <div className="overview-grid">
             {cards.map(c => (
               <Link href={c.link} key={c.id} style={{ textDecoration: 'none' }} className="overview-card">
                 <div style={{
@@ -73,7 +73,6 @@ export default function Home() {
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                  transition: 'all 0.2s ease',
                   cursor: 'pointer'
                 }}>
                   <h3 style={{
@@ -111,22 +110,6 @@ export default function Home() {
         </section>
       </main>
 
-      <style>{`
-        .overview-grid {
-          grid-template-columns: repeat(4, 1fr);
-        }
-        .overview-card > div:hover {
-          transform: translateY(-4px);
-          border-color: #4caf7d !important;
-          box-shadow: 0 12px 24px rgba(0,0,0,0.06);
-        }
-        @media (max-width: 968px) {
-          .overview-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 640px) {
-          .overview-grid { grid-template-columns: 1fr; }
-        }
-      `}</style>
       <Footer />
     </>
   )
