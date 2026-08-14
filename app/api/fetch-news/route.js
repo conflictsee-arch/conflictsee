@@ -8,10 +8,14 @@ import {
   safeGroqCall
 } from '@/lib/groqClients'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+// Lazy client — created per request so `next build` succeeds without env vars
+// (external PRs / CI have no secrets).
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+}
 
 // 🔒 HARD LOCK — Groq NEVER generates
 //    anything on or before this date
@@ -29,6 +33,8 @@ export async function GET(request) {
   }
 
   try {
+    const supabase = getSupabase()
+
     // ━━━━━━━━━━━━━━━━━━━━━━━
     // STEP 1: Find where to
     // continue generation from
