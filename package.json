@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
+    "@svg-maps/world": "^2.0.0",
     "chart.js": "^4.4.0",
     "framer-motion": "^12.38.0",
     "groq-sdk": "^1.1.1",

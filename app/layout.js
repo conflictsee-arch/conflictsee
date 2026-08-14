@@ -33,9 +33,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} ${spaceMono.variable}`} suppressHydrationWarning>
       <body style={{ fontFamily: 'var(--font-inter), Inter, sans-serif' }} suppressHydrationWarning>
-        <main style={{ minHeight: '100vh', background: '#ffffff' }}>
+        <div className="app-root" style={{ minHeight: '100vh', background: 'var(--bg-page)' }}>
           {children}
-        </main>
+        </div>
       </body>
     </html>
   )

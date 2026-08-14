@@ -81,6 +81,18 @@ body {
 }
 
 /* =====================
+   RESPONSIVE GRIDS (economics page)
+   ===================== */
+@media (max-width: 900px) {
+  .commodity-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .currency-grid  { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 540px) {
+  .commodity-grid { grid-template-columns: 1fr !important; }
+  .heatmap-grid   { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* =====================
    PULSE ANIMATION
    ===================== */
 .pulse-dot {
@@ -364,6 +376,10 @@ html {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
 }
 
 /* =====================

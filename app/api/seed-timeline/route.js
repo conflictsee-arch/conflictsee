@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { FULL_TIMELINE } from './full-timeline-data'
-import { timelineGroq } from '@/lib/groqClients'
+import { groqWithPool } from '@/lib/groqClients'
 
 function getSupabase() {
   return createClient(
@@ -74,7 +74,7 @@ Western: Reuters, AP, BBC News, CNN, The Guardian, New York Times, Washington Po
 Eastern/Middle Eastern: IRNA (Iranian state news), Press TV, Al Arabiya, Tehran Times, Mehr News Agency, Tasnim News, Ynet (Hebrew), Jerusalem Post, IDF Spokesperson, TASS, Xinhua, RT, Dawn (Pakistan), Times of India, Gulf News
 
 Rules for events:
-- Generate 12-18 events per date range
+- Generate 12-18 events spread across this date range
 - All event times MUST be in UTC (24hr) in the field "time" (HH:MM UTC)
 - Events must be hour-by-hour realistic
 - Each event must have 3-5 bullet points, with exact details:
@@ -82,13 +82,14 @@ Rules for events:
 - Mix ALL types: military strikes, diplomatic meetings, humanitarian reports, economic impacts, protests, ceasefire attempts, official statements
 - Build a realistic escalating narrative day by day
 - Sources must be DIVERSE — alternate between Western, Israeli, Iranian, Gulf, Asian sources
+- IMPORTANT: You must NOT generate duplicate or vague event titles. Each title must be a specific, distinct headline (e.g. "IDF Stryker Convoy Hit by Iranian Drones Near Khan Younis") — never generic ones like "Ceasefire Talks Underway" or "Military Escalation Continues".
 
 Return ONLY a JSON array. Each item must have EXACTLY this shape:
 {
   "date": "YYYY-MM-DD",
   "time": "HH:MM",
   "day_number": ${dayNumberStart},
-  "title": "Breaking headline max 12 words",
+  "title": "Specific headline max 12 words",
   "context_header": "One line subtitle explaining broader significance",
   "bullets": [
     { "summary": "Short 1-line fact", "detail": "2-4 sentences with specific names, numbers, locations, weapon systems" }
@@ -101,6 +102,7 @@ Return ONLY a JSON array. Each item must have EXACTLY this shape:
 }
 
 Constraints:
+- All event dates MUST fall inside the range ${dateRange}
 - Use the provided day_number start value. For events on later dates inside this call, increment day_number appropriately (Feb 28, 2026 = Day 1).
 - verified must be exactly ${verifiedFlag} for all returned events in this call.
 
@@ -122,6 +124,14 @@ Return ONLY valid JSON array (no markdown, no extra text). Start your response i
 
     const data = await res.json()
     if (!res.ok || data?.error) {
+      // Try the rotation pool as a fallback before giving up.
+      try {
+        const fallback = await groqWithPool.timeline(prompt, 6000, 0.1)
+        const fbParsed = parseJsonArrayFromContent(fallback)
+        if (Array.isArray(fbParsed)) return fbParsed
+      } catch {
+        // fall through to error
+      }
       const msg = data?.error?.message || JSON.stringify(data).slice(0, 300)
       throw new Error(`Groq call failed: ${res.status} ${msg}`)
     }
@@ -139,24 +149,11 @@ Return ONLY valid JSON array (no markdown, no extra text). Start your response i
   try {
     const supabase = getSupabase()
 
-    // ✅ SAFE DELETE — only removes
-    //    unlocked/AI generated events
-    // 🔒 NEVER touches is_locked = true
-    const { error: deleteError } =
-      await supabase
-        .from('events')
-        .delete()
-        .eq('is_locked', false)
-    
-    if (deleteError) {
-      console.error(
-        'Delete error:', deleteError
-      )
-      return NextResponse.json({
-        error: 'Delete failed'
-      }, { status: 500 })
-    }
-    
+    // ✅ No destructive delete — the gap-aware generator below only
+    //    purges placeholder-titled unlocked events and fills under-
+    //    covered windows, so an interrupted/budget-capped run can
+    //    never wipe existing coverage.
+
     // Confirm locked data is safe:
     const { count: lockedCount } =
       await supabase
@@ -182,8 +179,20 @@ Return ONLY valid JSON array (no markdown, no extra text). Start your response i
     const errors = []
 
     // TASK 5 — Insert verified hardcoded timeline (UTC times, bullets as objects)
+    // Deduped by title so re-running never duplicates locked rows.
+    const { data: allExistingTitles } = await supabase
+      .from('events')
+      .select('title')
+    const existingTitleSet = new Set(
+      (allExistingTitles || []).map((e) => (e.title || '').toLowerCase())
+    )
+
     if (Array.isArray(FULL_TIMELINE) && FULL_TIMELINE.length > 0) {
       for (const event of FULL_TIMELINE) {
+        const titleKey = (event.title || '').toLowerCase()
+        if (existingTitleSet.has(titleKey)) continue
+        existingTitleSet.add(titleKey)
+
         const published_at = new Date(`${event.date}T${event.time}:00Z`).toISOString()
         const descriptionPayload = JSON.stringify({
           context_header: event.context_header ?? '',
@@ -221,7 +230,10 @@ Return ONLY valid JSON array (no markdown, no extra text). Start your response i
       )
     }
 
-    // Groq for Mar 21 onward only (skip if already covered by FULL_TIMELINE)
+    // ── Gap-aware Groq timeline: purge placeholder rows, then only
+    //    generate for under-covered 7-day windows. Never deletes the
+    //    whole unlocked dataset — a partial/budget-capped run won't
+    //    wipe existing coverage.
     const IST_OFFSET_MINUTES = 330
     const baseDayMs = new Date('2026-02-28T00:00:00Z').getTime()
     const getISTDateYYYYMMDD = () => {
@@ -232,62 +244,123 @@ Return ONLY valid JSON array (no markdown, no extra text). Start your response i
 
     const groqStartDate = '2026-03-21'
     const endDate = getISTDateYYYYMMDD()
+    const chunkDays = Math.max(1, parseInt(new URL(req.url).searchParams.get('chunk') || '7', 10))
+    const minPerChunk = Math.max(1, parseInt(new URL(req.url).searchParams.get('min') || '3', 10))
 
     const startMs = new Date(`${groqStartDate}T00:00:00Z`).getTime()
     const endMs = new Date(`${endDate}T00:00:00Z`).getTime()
 
+    const PLACEHOLDER_RE = /^(ceasefire agreement reached|diplomatic breakthrough reported|ceasefire talks underway|peace talks stall|peace talks scheduled|military escalation continues|diplomatic efforts underway|humanitarian crisis deepens|economic sanctions imposed|cyberattacks intensify|iran launches missile strike|war economy|israeli military launches ground invasion)$/i
+
     if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs) {
-      const dayNumberStart = Math.floor((startMs - baseDayMs) / 86400000) + 1
+      let groqInserted = 0
+      let groqSkipped = 0
+      let purged = 0
+      const skippedRanges = []
 
-      const dateRangeLabel = `Mar 21 - ${endDate}`
-      const dateRange = `${groqStartDate} - ${endDate}`
+      // 1) Purge placeholder-titled unlocked events (keep real ones)
+      const { data: allUnlocked } = await supabase
+        .from('events')
+        .select('id, title')
+        .eq('is_locked', false)
+      for (const row of allUnlocked || []) {
+        if (PLACEHOLDER_RE.test((row.title || '').trim())) {
+          const { error } = await supabase.from('events').delete().eq('id', row.id)
+          if (!error) purged++
+        }
+      }
+      if (purged > 0) console.log(`🧹 Purged ${purged} placeholder timeline events`)
 
-      const groqEvents = await fetchGroqEvents(
-        dateRangeLabel,
-        dateRange,
-        dayNumberStart,
-        false
-      )
+      // 2) For each window: if already well-covered, skip; else generate.
+      for (let cStart = new Date(startMs); cStart.getTime() <= endMs; ) {
+        const cEnd = new Date(cStart)
+        cEnd.setDate(cEnd.getDate() + chunkDays - 1)
+        if (cEnd.getTime() > endMs) cEnd.setTime(endMs)
 
-      // Insert Groq events with duplicate check
-      for (const event of groqEvents) {
-        const published_at = new Date(`${event.date}T${event.time}:00Z`).toISOString()
-        const descriptionPayload = JSON.stringify({
-          context_header: event.context_header ?? '',
-          bullets: Array.isArray(event.bullets) ? event.bullets : [],
-          day_number: typeof event.day_number === 'number' ? event.day_number : null,
-        })
+        const rangeFrom = cStart.toISOString().slice(0, 10)
+        const rangeTo = cEnd.toISOString().slice(0, 10)
+        const dayNumberStart = Math.floor((cStart.getTime() - baseDayMs) / 86400000) + 1
 
-        // Dedupe by title + published_at
-        const { data: existing } = await supabase
+        // Load existing (unlocked) events in this range for dedupe/coverage
+        const { data: rangeEvents } = await supabase
           .from('events')
-          .select('id')
-          .eq('title', event.title)
-          .eq('published_at', published_at)
-          .maybeSingle()
+          .select('id, title, published_at')
+          .gte('published_at', `${rangeFrom}T00:00:00Z`)
+          .lte('published_at', `${rangeTo}T23:59:59Z`)
+        const rangeRows = rangeEvents || []
+        const rangeTitles = new Set(rangeRows.map(e => (e.title || '').toLowerCase()))
 
-        if (existing) {
-          // eslint-disable-next-line no-continue
+        // Skip already-well-covered windows
+        if (rangeRows.length >= minPerChunk) {
+          skippedRanges.push(rangeFrom)
+          cStart.setDate(cStart.getDate() + chunkDays)
           continue
         }
 
-        const { error } = await supabase.from('events').insert([
-          {
-            title: event.title,
-            description: descriptionPayload,
-            source: event.source ?? null,
-            source_url: event.source_url ?? null,
-            published_at,
-            category: normalizeCategory(event.category),
-            severity: normalizeSeverity(event.severity),
-            verified: false,
-            created_at: new Date().toISOString(),
-          },
-        ])
-        total++
-        if (!error) saved++
-        else errors.push(error.message)
+        const dateRangeLabel = `${rangeFrom} → ${rangeTo}`
+        let groqEvents = []
+        try {
+          groqEvents = await fetchGroqEvents(
+            dateRangeLabel,
+            `${rangeFrom} - ${rangeTo}`,
+            dayNumberStart,
+            false
+          )
+        } catch (e) {
+          errors.push(`Groq failed ${rangeFrom}–${rangeTo}: ${e.message}`)
+          cStart.setDate(cStart.getDate() + chunkDays)
+          continue
+        }
+
+        for (const event of groqEvents) {
+          if (!event?.date) continue
+          if (event.date < groqStartDate) continue
+          if (PLACEHOLDER_RE.test((event.title || '').trim())) continue
+
+          const published_at = new Date(`${event.date}T${event.time}:00Z`).toISOString()
+          const descriptionPayload = JSON.stringify({
+            context_header: event.context_header ?? '',
+            bullets: Array.isArray(event.bullets) ? event.bullets : [],
+            day_number: typeof event.day_number === 'number' ? event.day_number : null,
+          })
+
+          const titleKey = (event.title || '').toLowerCase()
+          if (rangeTitles.has(titleKey)) {
+            groqSkipped++
+            continue
+          }
+          rangeTitles.add(titleKey)
+
+          const { error } = await supabase.from('events').insert([
+            {
+              title: event.title,
+              description: descriptionPayload,
+              source: event.source ?? null,
+              source_url: event.source_url ?? null,
+              published_at,
+              category: normalizeCategory(event.category),
+              severity: normalizeSeverity(event.severity),
+              verified: false,
+              created_at: new Date().toISOString(),
+            },
+          ])
+          total++
+          if (!error) {
+            groqInserted++
+            saved++
+          } else {
+            errors.push(error.message)
+          }
+        }
+
+        cStart.setDate(cStart.getDate() + chunkDays)
+        // Pace calls to respect Groq free-tier RPM limits (both orgs share the
+        // same org-level RPM budget only within their own org, but hammering
+        // either key back-to-back trips 429).
+        await new Promise((res) => setTimeout(res, 4000))
       }
+
+      console.log(`🧩 Chunked timeline done: +${groqInserted} inserted, ${groqSkipped} deduped, ${skippedRanges.length} windows skipped`)
     }
 
     return NextResponse.json({

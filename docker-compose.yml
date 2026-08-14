@@ -1,0 +1,37 @@
+services:
+  # Local Postgres (supabase-flavored) for exploring the code without a real Supabase project.
+  # Note: Supabase adds auth/RLS on top of Postgres; for full parity use the Supabase CLI
+  # (see README) and point NEXT_PUBLIC_SUPABASE_URL at your local stack.
+  db:
+    image: postgres:16-alpine
+    container_name: conflictsee-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: conflictsee
+    ports:
+      - "5432:5432"
+    volumes:
+      - conflictsee-pgdata:/var/lib/postgresql/data
+      - ./supabase-init:/docker-entrypoint-initdb.d:ro
+
+  # Dev app (optional) — or run `npm run dev` on the host and point it at the db service.
+  app:
+    image: node:20-alpine
+    container_name: conflictsee-app
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    command: sh -c "npm install && npm run dev"
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: http://localhost:5432
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: local-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: local-service-role
+      CRON_SECRET: local-cron-secret
+
+volumes:
+  conflictsee-pgdata:

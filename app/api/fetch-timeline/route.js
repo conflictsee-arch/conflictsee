@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
-import { getTimelineGroqClient, TIMELINE_SYSTEM_PROMPT } from '@/lib/timelineGroq'
+import { runTimelineGroqMessages, TIMELINE_SYSTEM_PROMPT } from '@/lib/timelineGroq'
 import { fetchTimelineNews } from '@/lib/timelineNews'
+import { rateLimit, clientIp } from '@/lib/rateLimit'
+import { logInfo, logError } from '@/lib/structuredLog'
+
+const ROUTE = 'fetch-timeline'
 
 function getSupabase() {
   return createClient(
@@ -9,16 +13,14 @@ function getSupabase() {
   )
 }
 
-export async function GET() {
-  console.log({
-    hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-    hasSupabaseKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    hasGroqKey1: !!process.env.GROQ_TIMELINE_KEY_1,
-    hasGroqKey2: !!process.env.GROQ_TIMELINE_KEY_2,
-    hasNewsData: !!process.env.NEWSDATA_KEY,
-    hasGNews: !!process.env.GNEWS_KEY,
-  })
+export async function GET(request) {
+  const rl = rateLimit(clientIp(request), 6, 60000)
+  if (!rl.ok) {
+    return Response.json(
+      { error: 'Too many requests. Please wait before fetching again.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } }
+    )
+  }
 
   try {
     const supabase = getSupabase()
@@ -60,30 +62,24 @@ export async function GET() {
 
     // 3. Process each article with Groq
     for (const article of articles) {
-      // Skip if no content or too thin
-      if (!article.content || article.content.length < 200) {
+      // Skip if no content or too thin. Google News RSS titles (content = title)
+      // are meaningful headlines (~20-120 chars) that Groq can summarize;
+      // true junk is < 20 chars.
+      if (!article.content || article.content.length < 20) {
         console.log(`Skipping thin article: ${article.title?.slice(0, 30)}... (${article.content?.length || 0} chars)`)
         skipped++
         continue
       }
 
       try {
-        const groq = getTimelineGroqClient()
+        const raw = await runTimelineGroqMessages([
+          { role: 'system', content: TIMELINE_SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: `Article title: ${article.title}\n\nArticle content: ${article.content.slice(0, 2000)}`,
+          },
+        ])
 
-        const completion = await groq.chat.completions.create({
-          model: 'llama-3.3-70b-versatile',
-          temperature: 0.1,
-          max_tokens: 1000,
-          messages: [
-            { role: 'system', content: TIMELINE_SYSTEM_PROMPT },
-            {
-              role: 'user',
-              content: `Article title: ${article.title}\n\nArticle content: ${article.content.slice(0, 2000)}`,
-            },
-          ],
-        })
-
-        const raw = completion.choices?.[0]?.message?.content?.trim()
         if (!raw) { 
           console.log(`Groq returned empty for ${article.title?.slice(0, 30)}...`)
           skipped++; 
@@ -102,7 +98,7 @@ export async function GET() {
 
         // Skip if Groq says not relevant
         if (parsed.skip) { 
-          console.log(`Groq irrelevant: ${article.title?.slice(0, 30)}...`)
+          console.log(`Groq irrelevant: ${article.title?.slice(0, 30)}... [${article.source || '?'}] [content ${article.content?.length || 0}c]`)
           skipped++; 
           continue; 
         }
@@ -172,10 +168,11 @@ export async function GET() {
         }
       } catch (err) {
         errors++
-        console.error('Groq error:', err.message)
+        logError(ROUTE, 'groq_item_error', err, { title: (article.title || '').slice(0, 40) })
       }
     }
 
+    logInfo(ROUTE, 'complete', { articles_fetched: articles.length, inserted, skipped, errors })
     return Response.json({
       success: true,
       message: 'Processed',
@@ -186,7 +183,7 @@ export async function GET() {
       new_events: results,
     })
   } catch (error) {
-    console.error('fetch-timeline ERROR:', error.message, error.stack)
+    logError(ROUTE, 'unhandled_error', error)
     return Response.json({
       error: error.message,
       stack: error.stack

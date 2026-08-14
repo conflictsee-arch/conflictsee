@@ -1,10 +1,16 @@
 # ConflictSee — Agent Instructions
-Last updated: March 2026
+Last updated: August 2026
+
+> 📄 **Full project documentation for sharing with others lives in `DETAILS.md`** (architecture, pages, design system, API routes, schema, env vars, cron, workflow).
+>
+> 📄 **Public-facing docs** (for the open-source repo): `README.md` (overview + setup), `CONTRIBUTING.md` (contributor rules), `SECURITY.md` (vulnerability reporting), `ACCESS_SETUP.md` (maintainer-only GitHub/Vercel setup), `LICENSE` (MIT).
 
 ## Project
 Real-time Iran-Israel war intelligence dashboard. 4 sections: Timeline, Economics, World Affairs, Rumors.
 
-Tech stack: Next.js 14 (App Router) · Tailwind CSS · Supabase · Google Fonts
+War started **Feb 28, 2026**. `WAR_START = new Date('2026-02-28T00:00:00Z')`. War day = `Math.floor((now - WAR_START) / 86400000) + 1`.
+
+Tech stack: Next.js 14 (App Router) · Tailwind CSS · Supabase · Groq (AI ingestion) · Google Fonts
 
 ## Live URLs
 - Production: https://conflictsee.vercel.app
@@ -12,14 +18,24 @@ Tech stack: Next.js 14 (App Router) · Tailwind CSS · Supabase · Google Fonts
 
 ## Route Structure
 ```
-/             → Home (Hero + StatsBar + 4 section cards)
-/timeline     → Conflict Timeline (events table)
-/economics    → Economic Dashboard (prices table)
-/world-affairs → World Affairs (countries table)
-/rumors       → Rumors & Intel (rumors table)
-/ask-ai       → Ask AI (Groq llama3 powered)
-/api/ask      → POST endpoint for AI chat
+/              → Home (Hero + StatsBar + 4 section cards)
+/timeline      → Conflict Timeline (events table, TimelineSection.jsx)
+/economics     → Economic Dashboard (prices + live markets)
+/world-affairs → World Affairs (static COUNTRY_PROFILES + world_affairs table + world_affairs_news)
+/rumors        → Rumors & Intel (rumors_news + legacy rumors)
 ```
+
+## API Routes
+| Route                      | Purpose                                                              |
+|----------------------------|----------------------------------------------------------------------|
+| `/api/fetch-timeline`      | Timeline ingestion: GDELT + Google News RSS + NewsData/GNews → Groq → events (cron, 30min)     |
+| `/api/fetch-news`          | Legacy generator for economics/world_affairs/rumors (CRON_SECRET)    |
+| `/api/process-news`        | Per-section: `?type=economics|world_affairs|rumors` → `*_news` tables (NewsData `size=10` only — free tier rejects 20). Sources: Currents API (primary, realtime) + Google News RSS + NewsData `/latest` + GNews |
+| `/api/seed-timeline`       | Gap-aware backfill: locked FULL_TIMELINE Feb28–Mar20 + chunked Groq for under-covered windows only. Params: `chunk` (days, default 7), `min` (per window, default 3). No destructive delete — purges placeholder titles only |
+| `/api/backfill-news`       | Gap-aware backfill for `*_news`: skips well-covered ranges, purges placeholder titles, retries on rate limits. Params: `type`, `chunk` (default 7), `min` (default 2), `batch` (items per chunk, default 3, low for budget) |
+| `/api/live-markets`        | Oil/commodities/forex/stock markets → market_cache (30min cache)     |
+
+`vercel.json` crons: `/api/fetch-timeline` + 3× `/api/process-news?type=...` every 30 min.
 
 ## Fonts
 - **Inter** = ALL text everywhere (headings, labels, descriptions, buttons, tags, nav links)
@@ -51,7 +67,7 @@ style={{ fontFamily: 'var(--font-space-mono), Space Mono, monospace' }}
 ## Design Rules
 - White cards (`#ffffff`) always — no dark cards
 - Light grey page background (`#f0f2f5`) always
-- Dark green (`#1a6b3c`) as primary accent
+- Dark green (`#1a6b3c`) as primary accent; red (`#dc2626`/`#e53935`) for rumors/unverified
 - All **buttons**: `border-radius: 999px` (fully rounded)
 - All **cards**: `border-radius: 16px`
 - No dark backgrounds anywhere (except featured card in StatsBar)
@@ -81,25 +97,56 @@ style={{ fontFamily: 'var(--font-space-mono), Space Mono, monospace' }}
 `.nav-link` · `.statsbar-grid` · `.hero-container` · `.hero-btn-primary` · `.hero-btn-secondary`
 
 ## Supabase Tables
-| Table       | Key columns                                                   |
-|-------------|---------------------------------------------------------------|
-| `events`    | id, timestamp_ist, headline, category, fact_check_status     |
-| `prices`    | id, asset_name, price, change_pct, currency, why_it_matters  |
-| `countries` | id, name, code, stance, impact_score, un_vote                |
-| `rumors`    | id, headline, fact_check_verdict, status, groq_reasoning     |
-| `sources`   | id, name, tier, url                                          |
+| Table                | Key columns                                                        |
+|----------------------|--------------------------------------------------------------------|
+| `events`             | id, timestamp_ist, headline, category, fact_check_status, published_at, verified, is_locked |
+| `prices`             | id, asset_name, price, change_pct, currency, why_it_matters        |
+| `countries`          | id, name, code, stance, impact_score, un_vote                      |
+| `world_affairs`      | country, flag, stance, military_involvement, latest_statement, summary |
+| `rumors`             | title, source_type, confidence, detail, region, first_seen, verified |
+| `sources`            | id, name, tier, url                                                |
+| `economics_news`     | title, summary, detail, category, severity, source, published_at, war_impact_note |
+| `world_affairs_news` | title, summary, detail, category, severity, countries[], source, published_at |
+| `rumors_news`        | title, summary, detail, category, severity, source, published_at, verified |
+| `market_cache`       | id ('main'), data (jsonb), updated_at |
 
 All tables have RLS enabled with public SELECT policy (`USING (true)`).
+
+## Key Assignment (per-section budgets)
+| Key env var            | Used by                                      |
+|------------------------|----------------------------------------------|
+| `GROQ_TIMELINE_KEY_1`  | Timeline (`fetch-timeline`, `seed-timeline`) |
+| `GROQ_KEY_ORG_2`       | Economics (`process-news?type=economics`)    |
+| `GROQ_KEY_ORG_3`       | World Affairs + Rumors (shared)              |
+| `GROQ_KEY_ORG_4`       | Shared backup for ALL (used on 429)          |
+
+## Data Pipeline Notes
+- **NewsData free tier** returns content `"ONLY AVAILABLE IN PAID PLANS"` — process-news falls back to `description`. Also rejects `size=20` — always use `size=10`. Free tier data is ~12h delayed.
+- **Currents API** (primary fresh source, `lib/currentsNews.js`): ~250 req/day free, real-time. 1 call per section per cron. Parse `published` with `new Date(a.published)`.
+- **Google News RSS** (`lib/googleNews.js`): free, no key, real-time headlines. Descriptions are source-link HTML only → `content` = title. Thin content is skipped by the timeline's 200-char gate.
+- **GDELT** (`lib/gdeltNews.js`): free, unlimited, strict 1 req/5s rate limit (module self-throttles + returns `[]` on 429). Real article content — richest key-free source for the timeline.
+- **GNews free tier** is rate-limited (100 req/day) and news is 12h delayed; paid tier for realtime.
+- **Alpha Vantage** free tier: 25 req/day, 5/min — live-markets must not run too often.
+- **Groq free tier**: 100K tokens/day **per organization** — all keys in the same org share one budget; rotation only helps across orgs. **Key pools** in `lib/groqClients.js` give each section its own key (separate budget) plus a shared backup:
+  - `GROQ_TIMELINE_KEY_1` → timeline
+  - `GROQ_KEY_ORG_2` → economics
+  - `GROQ_KEY_ORG_3` → world_affairs + rumors
+  - `GROQ_KEY_ORG_4` → shared backup for all (used on 429)
+  Backfills must be gap-aware (see `/api/backfill-news` and `/api/seed-timeline`) and use low `batch`/`chunk` to stay within budget. When TPD is exhausted Groq returns `429 type:"tokens"` — retry after the window (error message shows `retry after`).
+- **Model**: `llama-3.3-70b-versatile` everywhere. Do NOT switch the timeline to `openai/gpt-oss-120b` — testing showed it returns `{"skip": true}` for legitimate war events (too conservative). `llama-3.3-70b-versatile` extracts them correctly.
+- **Article extraction** (`lib/articleExtractor.js`): fetches real bodies from article URLs to enrich thin feeds. Google News RSS links are `news.google.com` JS redirects — blocked (cannot resolve server-side). Currents/GNews/NewsData URLs resolve fine.
+- `upsert(..., { onConflict: 'title' })` requires a unique constraint on `title` in each `*_news` table.
 
 ## Completed Features
 - Hero section with live IST clock (mounted-guarded)
 - StatsBar with animated counters (no inline styles)
-- 4 data sections fetching from Supabase (60s auto-refresh)
-- Ask AI with Groq llama3-8b
-- Framer-motion scroll animations (no borderColor in whileHover)
-- Mobile responsive all pages
+- 4 pages: Timeline (server→client), Economics, World Affairs, Rumors (all client)
+- World Affairs: static COUNTRY_PROFILES merged with live world_affairs table + news feed, stance-grouped layout
+- Rumors: merged rumors_news + rumors, UNVERIFIED warning banner, category/severity filters, expandable cards
+- Auto-refresh every 5 min + manual "Refresh Intel" buttons calling `/api/process-news`
+- Backfilled timeline: Feb 28 → present (events), plus economics/world_affairs/rumors news feeds
 - Active route highlighting in navbar (mounted-guarded)
-- Loading spinners for all 5 routes
+- Loading spinners on all routes
 - Favicon SVG + OG metadata
 - Smooth scroll behavior
 
@@ -107,12 +154,16 @@ All tables have RLS enabled with public SELECT policy (`USING (true)`).
 ```
 c:\code\Conflictsee\
 ├── app/
-│   ├── api/ask/
-│   ├── timeline/      (page.js + loading.jsx)
+│   ├── api/
+│   │   ├── fetch-news/        (route.js)
+│   │   ├── fetch-timeline/    (route.js)
+│   │   ├── live-markets/      (route.js)
+│   │   ├── process-news/      (route.js)
+│   │   └── seed-timeline/     (route.js + full-timeline-data.js)
 │   ├── economics/     (page.js + loading.jsx)
-│   ├── world-affairs/ (page.js + loading.jsx)
 │   ├── rumors/        (page.js + loading.jsx)
-│   ├── ask-ai/        (page.js + loading.jsx)
+│   ├── timeline/      (page.js + loading.jsx)
+│   ├── world-affairs/ (page.js + loading.jsx)
 │   ├── globals.css
 │   ├── layout.js
 │   └── page.js
@@ -121,12 +172,18 @@ c:\code\Conflictsee\
 │   ├── StatsBar.jsx
 │   ├── HeroSection.jsx
 │   ├── Footer.jsx
-│   ├── TimelineSection.jsx
-│   ├── EconomicsSection.jsx
-│   ├── WorldAffairsSection.jsx
-│   └── RumorsSection.jsx
+│   └── TimelineSection.jsx
 ├── lib/
-│   └── supabase.js
+│   ├── articleExtractor.js
+│   ├── countryStances.js
+│   ├── currentsNews.js
+│   ├── gdeltNews.js
+│   ├── googleNews.js
+│   ├── groqClients.js
+│   ├── rateLimit.js
+│   ├── supabase.js
+│   ├── timelineGroq.js
+│   └── timelineNews.js
 ├── public/
 │   └── favicon.svg
 ├── .env.local
@@ -138,6 +195,8 @@ c:\code\Conflictsee\
 - NO credibility score 0–100%
 - NO community voting
 - NO upvote/downvote buttons
+- NO Ask AI page or /api/ask endpoint
+- Deleted dead code: `lib/apiClients.js`, `components/EconomicsSection.jsx`, `RumorsSection.jsx`, `WorldAffairsSection.jsx`
 
 ## Deployment Rules (CRITICAL)
 1. **NEVER push to GitHub automatically.** Only push when explicitly commanded with "push to git" or "push to github".

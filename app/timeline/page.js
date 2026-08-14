@@ -1,6 +1,6 @@
-import Navbar from '@/components/Navbar'
-import TimelineSection from '@/components/TimelineSection'
-import Footer from '@/components/Footer'
+import Navbar from '@/components/layout/Navbar'
+import TimelineSection from '@/components/timeline/TimelineSection'
+import Footer from '@/components/layout/Footer'
 
 export const metadata = {
   title: 'Timeline | ConflictSee',
@@ -11,9 +11,9 @@ export default function TimelinePage() {
   return (
     <>
       <Navbar />
-      <main className="max-w-[1200px] mx-auto px-8 py-16" style={{ maxWidth: '1200px', margin: '0 auto', padding: '64px 32px' }}>
+      <div className="max-w-[1200px] mx-auto px-8 py-16" style={{ maxWidth: '1200px', margin: '0 auto', padding: '64px 32px' }}>
         <TimelineSection />
-      </main>
+      </div>
       <Footer />
     </>
   )
