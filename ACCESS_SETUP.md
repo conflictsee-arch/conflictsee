@@ -3,6 +3,9 @@
 > **This file is for the project maintainers.** It covers GitHub/Vercel dashboard actions that
 > must be done by a human with Admin access. These are instructions — nothing here is automated.
 
+**Public contact email:** conflictsee@gmail.com (suggestions, partnerships, security reports,
+or building around the project).
+
 ---
 
 ## 1. Branch protection on `main`

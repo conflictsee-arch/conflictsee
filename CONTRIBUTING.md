@@ -2,6 +2,8 @@
 
 Thanks for your interest! ConflictSee is an open-source real-time war intelligence dashboard built and maintained by [Vyden Co.](https://vyden.co.in).
 
+Questions, suggestions, or ideas to build around ConflictSee? Email us at **conflictsee@gmail.com**.
+
 This guide translates the project's internal rules (see `AGENTS.md`) into human-readable contributor guidelines.
 
 ## Table of Contents

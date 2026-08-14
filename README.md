@@ -6,6 +6,10 @@ Built and maintained by [Vyden Co.](https://vyden.co.in)
 
 > **Live demo:** https://conflictsee.vercel.app
 
+## Contact
+
+Questions, suggestions, or want to build something around ConflictSee? Reach us at **conflictsee@gmail.com**.
+
 ---
 
 ## What it does

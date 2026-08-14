@@ -6,7 +6,7 @@ ConflictSee is maintained by **Vyden Co.** If you find a security vulnerability,
 
 Please send details to the security contact:
 
-- **Email:** security@vyden.co.in
+- **Email:** conflictsee@gmail.com
 - **GitHub Security Advisory:** enabled on this repository (Settings → Security → Advisories)
 
 ### What to include
