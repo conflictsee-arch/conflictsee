@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          GROQ_TIMELINE_KEY_1: ${{ secrets.GROQ_TIMELINE_KEY_1 }}
+          GROQ_KEY_ORG_2: ${{ secrets.GROQ_KEY_ORG_2 }}
+          GROQ_KEY_ORG_3: ${{ secrets.GROQ_KEY_ORG_3 }}
+          GROQ_KEY_ORG_4: ${{ secrets.GROQ_KEY_ORG_4 }}
+          CURRENTS_KEY: ${{ secrets.CURRENTS_KEY }}
+          NEWSDATA_KEY: ${{ secrets.NEWSDATA_KEY }}
+          GNEWS_KEY: ${{ secrets.GNEWS_KEY }}
+          ALPHAVANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_KEY }}
+          EXCHANGERATE_KEY: ${{ secrets.EXCHANGERATE_KEY }}
+          OILPRICE_KEY: ${{ secrets.OILPRICE_KEY }}
+
+  # NOTE: Deploys are MANUAL ONLY (per CONTRIBUTING.md). This workflow intentionally
+  # has NO deploy step — it only lints and builds. Do not add auto-deploy or auto-push.

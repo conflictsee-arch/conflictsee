@@ -126,6 +126,7 @@ All third-party services are **free-tier** and **will rate-limit** under load:
 - `DETAILS.md` — full project documentation (architecture, API routes, schema)
 - `CONTRIBUTING.md` — how to contribute
 - `SECURITY.md` — vulnerability reporting
+- `DEPLOY.md` — Vercel deployment checklist (maintainers)
 
 ## License
 
