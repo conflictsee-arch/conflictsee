@@ -44,6 +44,10 @@ jobs:
           ALPHAVANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_KEY }}
           EXCHANGERATE_KEY: ${{ secrets.EXCHANGERATE_KEY }}
           OILPRICE_KEY: ${{ secrets.OILPRICE_KEY }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_SUPPRESS_GLOBAL_ERROR_HANDLER_FILE_WARNING: 1
 
   # NOTE: Deploys are MANUAL ONLY (per CONTRIBUTING.md). This workflow intentionally
   # has NO deploy step — it only lints and builds. Do not add auto-deploy or auto-push.
