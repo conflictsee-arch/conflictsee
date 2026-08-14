@@ -1,0 +1,44 @@
+name: Data Refresh Cron
+
+# Free 30-min ingestion, independent of Vercel's Hobby cron limit.
+# Replaces vercel.json crons (Vercel Hobby allows only 1 cron run/day).
+#
+# Budget (private repo): 48 runs/day ~ 1,440 runs/month, each ~1 min
+# (one job, four curl calls) => ~1,440 min/month, under the 2,000 free
+# minutes. If this repo ever goes public, GitHub Actions minutes are free.
+#
+# The four endpoints use per-IP rate limiting (not CRON_SECRET), so
+# scheduled calls are safe. Set repo variable PRODUCTION_URL if the
+# Vercel deployment URL differs from the default.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: data-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh-data:
+    name: Refresh timeline + news
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fetch timeline
+        run: curl -fsS -o /dev/null "$PRODUCTION_URL/api/fetch-timeline"
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://conflictsee.vercel.app' }}
+      - name: Process economics news
+        run: curl -fsS -o /dev/null "$PRODUCTION_URL/api/process-news?type=economics"
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://conflictsee.vercel.app' }}
+      - name: Process world affairs news
+        run: curl -fsS -o /dev/null "$PRODUCTION_URL/api/process-news?type=world_affairs"
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://conflictsee.vercel.app' }}
+      - name: Process rumors news
+        run: curl -fsS -o /dev/null "$PRODUCTION_URL/api/process-news?type=rumors"
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://conflictsee.vercel.app' }}

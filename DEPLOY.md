@@ -34,6 +34,10 @@ Vercel → project → **Settings → Environment Variables** — add every vari
 | `ALPHAVANTAGE_KEY` | your alpha vantage key |
 | `EXCHANGERATE_KEY` | your exchangerate key |
 | `OILPRICE_KEY` | your oilprice key |
+| `SENTRY_DSN` | your Sentry DSN |
+| `NEXT_PUBLIC_SENTRY_DSN` | your Sentry DSN |
+| `SENTRY_AUTH_TOKEN` | optional — Sentry source-map uploads |
+| `SENTRY_TRACING` | `false` |
 
 > **Production + Preview:** set these for both scopes so previews work too.
 > ⚠️ Preview builds inherit env vars — see `ACCESS_SETUP.md` §4 for the quota risk.
@@ -42,20 +46,25 @@ Vercel → project → **Settings → Environment Variables** — add every vari
 
 Vercel → **Deployments** → latest → **Redeploy** (or push to `main` → auto-deploys).
 
-## 4. Verify crons (every 30 min)
+## 4. Verify scheduled ingestion (GitHub Actions, every 30 min)
 
-`vercel.json` defines 4 crons — check Vercel → **Settings → Cron Jobs**:
+Scheduled ingestion no longer lives in Vercel (Hobby plan allows only 1 cron run/day).
+It runs as a **GitHub Actions workflow** (`.github/workflows/data-refresh.yml`) every
+30 min, free on any plan. It calls these 4 production endpoints:
 
 | Path | Schedule |
 |---|---|
-| `/api/fetch-timeline` | `*/30 * * * *` |
-| `/api/process-news?type=economics` | `*/30 * * * *` |
-| `/api/process-news?type=world_affairs` | `*/30 * * * *` |
-| `/api/process-news?type=rumors` | `*/30 * * * *` |
+| `https://<project>.vercel.app/api/fetch-timeline` | `*/30 * * * *` |
+| `https://<project>.vercel.app/api/process-news?type=economics` | `*/30 * * * *` |
+| `https://<project>.vercel.app/api/process-news?type=world_affairs` | `*/30 * * * *` |
+| `https://<project>.vercel.app/api/process-news?type=rumors` | `*/30 * * * *` |
 
-> **Note:** on the Vercel **free/Hobby plan**, cron jobs may not run reliably. Cron jobs
-> require the **Pro plan** (`vercel cron add`). If you're on Hobby, ingestion only runs
-> when someone visits — the "Refresh" buttons on each page call the same routes manually.
+- If the deployment URL differs from `conflictsee.vercel.app`, set a **repo variable**
+  `PRODUCTION_URL` (GitHub → Settings → Secrets and variables → Actions → Variables).
+- Verify runs on GitHub → **Actions** → **Data Refresh Cron** → each run shows 4
+  successful steps. There's also a **Run workflow** button for manual triggers.
+- The "Refresh" buttons on each page call the same routes manually — works without
+  any cron.
 
 ## 5. Post-deploy smoke test
 

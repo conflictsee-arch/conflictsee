@@ -33,7 +33,7 @@ flowchart LR
         E[GNews]
     end
 
-    subgraph Ingestion["AI Ingestion (Vercel cron · 30 min)"]
+    subgraph Ingestion["AI Ingestion (GitHub Actions cron · 30 min)"]
         F[fetch-timeline / process-news]
         G[Groq · llama-3.3-70b-versatile]
     end
@@ -47,15 +47,15 @@ flowchart LR
     F -- "re-ingest every 30 min" --> H
 
     subgraph Markets
-        J[live-markets cron]
+        J[live-markets]
     end
     J --> H
 ```
 
-- **Sources** (Currents, Google News RSS, GDELT, NewsData, GNews) feed the ingestion crons.
+- **Sources** (Currents, Google News RSS, GDELT, NewsData, GNews) feed the ingestion workflow.
 - **Groq** (`llama-3.3-70b-versatile`) extracts structured events, filtering irrelevant content.
 - **Supabase** stores events, prices, news, and market cache.
-- **Client pages** poll Supabase every 5 minutes; **Vercel crons** re-ingest every 30 minutes.
+- **Client pages** poll Supabase every 5 minutes; **GitHub Actions** re-ingests every 30 minutes (free on any Vercel plan).
 
 ## Tech Stack
 
@@ -116,6 +116,7 @@ All third-party services are **free-tier** and **will rate-limit** under load:
 | ExchangeRate | `EXCHANGERATE_KEY` | Forex | limited |
 | OilPrice API | `OILPRICE_KEY` | Oil/commodities | limited |
 | Cron | `CRON_SECRET` | Secures internal routes | — |
+| Sentry | `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN` | Error monitoring | optional |
 
 > See `AGENTS.md` (key-pool table) for how keys map to sections.
 

@@ -28,14 +28,14 @@ Tech stack: Next.js 14 (App Router) · Tailwind CSS · Supabase · Groq (AI inge
 ## API Routes
 | Route                      | Purpose                                                              |
 |----------------------------|----------------------------------------------------------------------|
-| `/api/fetch-timeline`      | Timeline ingestion: GDELT + Google News RSS + NewsData/GNews → Groq → events (cron, 30min)     |
+| `/api/fetch-timeline`      | Timeline ingestion: GDELT + Google News RSS + NewsData/GNews → Groq → events (GitHub Actions cron, 30min)     |
 | `/api/fetch-news`          | Legacy generator for economics/world_affairs/rumors (CRON_SECRET)    |
 | `/api/process-news`        | Per-section: `?type=economics|world_affairs|rumors` → `*_news` tables (NewsData `size=10` only — free tier rejects 20). Sources: Currents API (primary, realtime) + Google News RSS + NewsData `/latest` + GNews |
 | `/api/seed-timeline`       | Gap-aware backfill: locked FULL_TIMELINE Feb28–Mar20 + chunked Groq for under-covered windows only. Params: `chunk` (days, default 7), `min` (per window, default 3). No destructive delete — purges placeholder titles only |
 | `/api/backfill-news`       | Gap-aware backfill for `*_news`: skips well-covered ranges, purges placeholder titles, retries on rate limits. Params: `type`, `chunk` (default 7), `min` (default 2), `batch` (items per chunk, default 3, low for budget) |
 | `/api/live-markets`        | Oil/commodities/forex/stock markets → market_cache (30min cache)     |
 
-`vercel.json` crons: `/api/fetch-timeline` + 3× `/api/process-news?type=...` every 30 min.
+`vercel.json` crons were **removed** — scheduled ingestion runs via **GitHub Actions** (`.github/workflows/data-refresh.yml`): `/api/fetch-timeline` + 3× `/api/process-news?type=...` every 30 min, free on any Vercel plan (Hobby allows only 1 cron/day). Vercel deploys are manual; Actions is the scheduler.
 
 ## Fonts
 - **Inter** = ALL text everywhere (headings, labels, descriptions, buttons, tags, nav links)
@@ -122,7 +122,7 @@ All tables have RLS enabled with public SELECT policy (`USING (true)`).
 
 ## Data Pipeline Notes
 - **NewsData free tier** returns content `"ONLY AVAILABLE IN PAID PLANS"` — process-news falls back to `description`. Also rejects `size=20` — always use `size=10`. Free tier data is ~12h delayed.
-- **Currents API** (primary fresh source, `lib/currentsNews.js`): ~250 req/day free, real-time. 1 call per section per cron. Parse `published` with `new Date(a.published)`.
+- **Currents API** (primary fresh source, `lib/currentsNews.js`): ~250 req/day free, real-time. 1 call per section per cron run. Parse `published` with `new Date(a.published)`.
 - **Google News RSS** (`lib/googleNews.js`): free, no key, real-time headlines. Descriptions are source-link HTML only → `content` = title. Thin content is skipped by the timeline's 200-char gate.
 - **GDELT** (`lib/gdeltNews.js`): free, unlimited, strict 1 req/5s rate limit (module self-throttles + returns `[]` on 429). Real article content — richest key-free source for the timeline.
 - **GNews free tier** is rate-limited (100 req/day) and news is 12h delayed; paid tier for realtime.

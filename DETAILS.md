@@ -16,7 +16,7 @@ ConflictSee aggregates live news, market prices, and diplomatic/intel data about
 3. **World Affairs** (`/world-affairs`) — country-by-country stances (alignment + intensity), a world stance map, and geopolitical news.
 4. **Rumors & Intel** (`/rumors`) — unverified/OSINT claims, always labeled `UNVERIFIED`, with severity and category filters.
 
-All data is fetched and **AI-processed by Groq** (`llama-3.3-70b-versatile`) into structured JSON, then stored in Supabase. Pages are client components that read directly from Supabase and auto-refresh every 5 minutes. Vercel cron jobs re-ingest every 30 minutes.
+All data is fetched and **AI-processed by Groq** (`llama-3.3-70b-versatile`) into structured JSON, then stored in Supabase. Pages are client components that read directly from Supabase and auto-refresh every 5 minutes. GitHub Actions re-ingests every 30 minutes (free on any Vercel plan — Hobby allows only 1 Vercel cron/day).
 
 ---
 
@@ -33,7 +33,7 @@ All data is fetched and **AI-processed by Groq** (`llama-3.3-70b-versatile`) int
 | Database | Supabase (Postgres, RLS enabled, public SELECT) |
 | AI ingestion | Groq API (`groq-sdk`) — model `llama-3.3-70b-versatile` |
 | Maps | `@svg-maps/world` |
-| Scheduling | `vercel.json` cron jobs (every 30 min) |
+| Scheduling | GitHub Actions cron (`.github/workflows/data-refresh.yml`, every 30 min) |
 | Deployment | Vercel (free plan) — **the user deploys manually, never auto-push** |
 
 ---
@@ -46,7 +46,7 @@ conflictsee/
 │   ├── api/
 │   │   ├── backfill-news/     route.js      → gap-aware backfill for *_news tables
 │   │   ├── fetch-news/        route.js      → LEGACY generator (economics/world_affairs/rumors, CRON_SECRET)
-│   │   ├── fetch-timeline/    route.js      → timeline ingestion (cron, 30min)
+│   │   ├── fetch-timeline/    route.js      → timeline ingestion (GitHub Actions cron, 30min)
 │   │   ├── live-markets/      route.js      → oil/commodities/markets/forex → market_cache (30min cache)
 │   │   ├── process-news/      route.js      → per-section: ?type=economics|world_affairs|rumors
 │   │   └── seed-timeline/     route.js      → gap-aware backfill (Feb 28–Mar 20 locked + Groq windows)
@@ -83,7 +83,7 @@ conflictsee/
 ├── .env.example               → template with placeholders
 ├── AGENTS.md                  → agent instructions (key budgets, rules, routes)
 ├── DETAILS.md                 → THIS FILE
-├── vercel.json                → cron schedule
+├── vercel.json                → Vercel framework config (no crons — they live in GitHub Actions)
 └── package.json
 ```
 
@@ -188,7 +188,7 @@ Each page: `Navbar` → header → content → `Footer`. Common patterns:
 
 ## 7. API Routes (in detail)
 
-### `GET /api/fetch-timeline` (cron, 30min)
+### `GET /api/fetch-timeline` (GitHub Actions cron, 30min)
 1. Rate-limited (6 req/min/IP).
 2. `fetchTimelineNews()` — pulls from **GDELT + Currents + Google News RSS + NewsData `/latest` + GNews**, dedupes, enriches thin articles with real bodies.
 3. Each article → Groq `llama-3.3-70b-versatile` via `runTimelineGroqMessages` (timeline key pool) → JSON event.
@@ -196,7 +196,7 @@ Each page: `Navbar` → header → content → `Footer`. Common patterns:
 5. Inserts into `events` with `verified:false`, `is_locked:false`.
 6. Returns `{ success, articles_fetched, inserted, skipped, errors, new_events }`.
 
-### `GET /api/process-news?type=economics|world_affairs|rumors` (cron, 30min)
+### `GET /api/process-news?type=economics|world_affairs|rumors` (GitHub Actions cron, 30min)
 1. Rate-limited (6 req/min/IP).
 2. Fetches **Currents API (primary, realtime) + Google News RSS + NewsData `/latest` (`size=10` only) + GNews** — ~29–43 articles.
 3. Enriches thin articles with bodies.
@@ -289,24 +289,39 @@ OILPRICE_KEY=
 ALPHAVANTAGE_KEY=
 EXCHANGERATE_KEY=
 CRON_SECRET=
+SENTRY_DSN=
+NEXT_PUBLIC_SENTRY_DSN=
+SENTRY_AUTH_TOKEN=
+SENTRY_TRACING=false
 ```
 
 > Note: `NEXT_PUBLIC_CRON_SECRET` was removed — never expose server-only secrets publicly.
 
 ---
 
-## 11. Cron Schedule (`vercel.json`)
+## 11. Cron Schedule (GitHub Actions)
 
-```json
-{
-  "crons": [
-    { "path": "/api/fetch-timeline",                     "schedule": "*/30 * * * *" },
-    { "path": "/api/process-news?type=economics",        "schedule": "*/30 * * * *" },
-    { "path": "/api/process-news?type=world_affairs",    "schedule": "*/30 * * * *" },
-    { "path": "/api/process-news?type=rumors",           "schedule": "*/30 * * * *" }
-  ]
-}
+Vercel's Hobby plan allows only **1 cron run/day**, so scheduled ingestion moved to
+**GitHub Actions** (`.github/workflows/data-refresh.yml`) — free on any plan, runs every
+30 min, and calls the production endpoints below. `vercel.json` has **no crons** anymore.
+
+```yaml
+on:
+  schedule:
+    - cron: '*/30 * * * *'
 ```
+
+| Endpoint hit | Purpose |
+|---|---|
+| `/api/fetch-timeline` | Timeline ingestion |
+| `/api/process-news?type=economics` | Economics news |
+| `/api/process-news?type=world_affairs` | World affairs news |
+| `/api/process-news?type=rumors` | Rumors news |
+
+- Budget: 1 job × ~1 min × 48 runs/day ≈ 1,440 min/month — under the free 2,000 min
+  (unlimited if the repo is public).
+- If the deployment URL differs from `conflictsee.vercel.app`, set repo variable
+  `PRODUCTION_URL` (Settings → Secrets and variables → Actions → Variables).
 
 ---
 
@@ -359,7 +374,7 @@ npm run start      # serve production build
 ## 15. Scalability Notes (for 1000+ users)
 
 - All reads are **client-side Supabase SELECT** (public RLS) — scales with Supabase, no server load.
-- Server API routes are only hit by crons + manual refresh buttons; Vercel free plan supports ~100K function invocations/day and 100GB bandwidth.
+- Server API routes are only hit by GitHub Actions cron + manual refresh buttons; Vercel free plan supports ~100K function invocations/day and 100GB bandwidth.
 - In-memory rate limiting on public routes deters abuse.
 - Avoid Supabase realtime websockets at scale (connection cap).
 
