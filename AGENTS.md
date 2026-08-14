@@ -203,3 +203,9 @@ c:\code\Conflictsee\
 2. **NEVER deploy to Vercel.** The user handles all deployments manually.
 3. When commanded to push, exactly execute: `git add .`, `git commit -m "description"`, `git push`.
 4. For all other tasks: make changes locally, run `npm run dev` to test, and wait for instructions.
+
+## Monitoring
+- **Sentry** wired in (`@sentry/nextjs`): `sentry.client.config.js`, `sentry.server.config.js`, `sentry.edge.config.js`, `instrumentation.ts`, `next.config.js` wrapped with `withSentryConfig`.
+- DSN read from env (`SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`); all `Sentry.init` calls gated behind `if (dsn)` so the build works without a DSN.
+- Source-map uploads only happen when `SENTRY_AUTH_TOKEN` is set (optional). Errors report without it.
+- Deprecation warnings (`disableLogger`, `sentry.client.config.js`) are cosmetic — fine to ignore on Next 14.1. `global-error.js` warning can be suppressed with `SENTRY_SUPPRESS_GLOBAL_ERROR_HANDLER_FILE_WARNING=1`.
