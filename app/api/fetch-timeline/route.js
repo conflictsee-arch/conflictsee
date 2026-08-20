@@ -76,7 +76,7 @@ export async function GET(request) {
           { role: 'system', content: TIMELINE_SYSTEM_PROMPT },
           {
             role: 'user',
-            content: `Article title: ${article.title}\n\nArticle content: ${article.content.slice(0, 2000)}`,
+            content: `Article title: ${article.title}\n\nArticle URL: ${article.url || ''}\n\nArticle content: ${article.content.slice(0, 2000)}`,
           },
         ])
 
@@ -139,6 +139,11 @@ export async function GET(request) {
         const finalDayNum = Math.min(dayNumRaw, maxDay)
 
         // Build Supabase row
+        const sourceUrl = [
+          parsed.source_url,
+          article.url,
+        ].find(u => u && !/^(not provided|n\/a|none|null)$/i.test(String(u).trim())) || null
+
         const { error } = await supabase.from('events').insert({
           title: parsed.title,
           description: JSON.stringify({
@@ -151,7 +156,7 @@ export async function GET(request) {
           category: parsed.category || 'Military',
           severity: parsed.severity || 'Medium',
           source: parsed.source || article.source,
-          source_url: parsed.source_url || article.url,
+          source_url: sourceUrl,
           verified: false,
           published_at: new Date(
             parsed.date + 'T' + (parsed.time || '12:00') + ':00Z'

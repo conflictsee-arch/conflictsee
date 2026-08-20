@@ -85,7 +85,7 @@ Key assignment and per-section budgets are documented in `AGENTS.md` (key-pool t
 **Ingestion rules:**
 - Keep backfill `batch`/`chunk` parameters low to stay within Groq's daily token budget.
 - `news.google.com` links are JS redirects and cannot be fetched server-side — skip them.
-- Never switch the timeline model from `llama-3.3-70b-versatile` — other models have been tested and are too conservative.
+- Never switch the model from `groq/compound` — Groq removed `llama-3.3-70b-versatile`; `gpt-oss-*` are too conservative and `qwen3.6-27b` emits thinking traces.
 
 ## Deployment policy
 

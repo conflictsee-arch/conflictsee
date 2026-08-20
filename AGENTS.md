@@ -133,7 +133,7 @@ All tables have RLS enabled with public SELECT policy (`USING (true)`).
   - `GROQ_KEY_ORG_3` → world_affairs + rumors
   - `GROQ_KEY_ORG_4` → shared backup for all (used on 429)
   Backfills must be gap-aware (see `/api/backfill-news` and `/api/seed-timeline`) and use low `batch`/`chunk` to stay within budget. When TPD is exhausted Groq returns `429 type:"tokens"` — retry after the window (error message shows `retry after`).
-- **Model**: `llama-3.3-70b-versatile` everywhere. Do NOT switch the timeline to `openai/gpt-oss-120b` — testing showed it returns `{"skip": true}` for legitimate war events (too conservative). `llama-3.3-70b-versatile` extracts them correctly.
+- **Model**: `groq/compound` everywhere. Groq **removed** `llama-3.3-70b-versatile` (returns `404 model_not_found` on all keys as of Aug 2026). Tested replacements: `groq/compound` extracts war events with clean JSON; `openai/gpt-oss-120b/20b` are too conservative (return `{"skip": true}` for legitimate war events); `qwen/qwen3.6-27b` emits thinking-trace text that breaks JSON parsing.
 - **Article extraction** (`lib/articleExtractor.js`): fetches real bodies from article URLs to enrich thin feeds. Google News RSS links are `news.google.com` JS redirects — blocked (cannot resolve server-side). Currents/GNews/NewsData URLs resolve fine.
 - `upsert(..., { onConflict: 'title' })` requires a unique constraint on `title` in each `*_news` table.
 

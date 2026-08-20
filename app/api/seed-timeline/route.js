@@ -115,7 +115,7 @@ Return ONLY valid JSON array (no markdown, no extra text). Start your response i
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'groq/compound',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 6000,
         temperature: 0.1,

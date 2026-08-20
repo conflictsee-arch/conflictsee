@@ -16,7 +16,7 @@ ConflictSee aggregates live news, market prices, and diplomatic/intel data about
 3. **World Affairs** (`/world-affairs`) — country-by-country stances (alignment + intensity), a world stance map, and geopolitical news.
 4. **Rumors & Intel** (`/rumors`) — unverified/OSINT claims, always labeled `UNVERIFIED`, with severity and category filters.
 
-All data is fetched and **AI-processed by Groq** (`llama-3.3-70b-versatile`) into structured JSON, then stored in Supabase. Pages are client components that read directly from Supabase and auto-refresh every 5 minutes. GitHub Actions re-ingests every 30 minutes (free on any Vercel plan — Hobby allows only 1 Vercel cron/day).
+All data is fetched and **AI-processed by Groq** (`groq/compound`) into structured JSON, then stored in Supabase. Pages are client components that read directly from Supabase and auto-refresh every 5 minutes. GitHub Actions re-ingests every 30 minutes (free on any Vercel plan — Hobby allows only 1 Vercel cron/day).
 
 ---
 
@@ -31,7 +31,7 @@ All data is fetched and **AI-processed by Groq** (`llama-3.3-70b-versatile`) int
 | Charts | chart.js 4 + react-chartjs-2 |
 | Fonts | Inter (all text), Space Mono (numbers/prices/times) via next/font |
 | Database | Supabase (Postgres, RLS enabled, public SELECT) |
-| AI ingestion | Groq API (`groq-sdk`) — model `llama-3.3-70b-versatile` |
+| AI ingestion | Groq API (`groq-sdk`) — model `groq/compound` |
 | Maps | `@svg-maps/world` |
 | Scheduling | GitHub Actions cron (`.github/workflows/data-refresh.yml`, every 30 min) |
 | Deployment | Vercel (free plan) — **the user deploys manually, never auto-push** |
@@ -191,7 +191,7 @@ Each page: `Navbar` → header → content → `Footer`. Common patterns:
 ### `GET /api/fetch-timeline` (GitHub Actions cron, 30min)
 1. Rate-limited (6 req/min/IP).
 2. `fetchTimelineNews()` — pulls from **GDELT + Currents + Google News RSS + NewsData `/latest` + GNews**, dedupes, enriches thin articles with real bodies.
-3. Each article → Groq `llama-3.3-70b-versatile` via `runTimelineGroqMessages` (timeline key pool) → JSON event.
+3. Each article → Groq `groq/compound` via `runTimelineGroqMessages` (timeline key pool) → JSON event.
 4. Validates ≥2 bullets; skips duplicates vs existing `events.title`; caps future dates; computes `day_number`.
 5. Inserts into `events` with `verified:false`, `is_locked:false`.
 6. Returns `{ success, articles_fetched, inserted, skipped, errors, new_events }`.
@@ -247,7 +247,7 @@ Each page: `Navbar` → header → content → `Footer`. Common patterns:
 | `GROQ_KEY_ORG_3` | World Affairs + Rumors | `process-news?type=world_affairs|rumors` |
 | `GROQ_KEY_ORG_4` | **Shared backup for all** | used on 429 |
 
-- Model: **`llama-3.3-70b-versatile` everywhere**.
+- Model: **`groq/compound` everywhere**.
   - ⚠️ Do NOT switch timeline to `openai/gpt-oss-120b` — testing showed it returns `{"skip":true}` for legitimate war events (too conservative).
 - Groq free tier = 100K tokens/day **per organization**. Keys in the same org share one budget; rotation only helps across orgs. On TPD exhaustion Groq returns `429 type:"tokens"` with `retry after` — retry after reset.
 

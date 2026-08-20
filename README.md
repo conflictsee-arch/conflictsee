@@ -35,7 +35,7 @@ flowchart LR
 
     subgraph Ingestion["AI Ingestion (GitHub Actions cron · 30 min)"]
         F[fetch-timeline / process-news]
-        G[Groq · llama-3.3-70b-versatile]
+        G[Groq · groq/compound]
     end
 
     H[(Supabase)]
@@ -53,7 +53,7 @@ flowchart LR
 ```
 
 - **Sources** (Currents, Google News RSS, GDELT, NewsData, GNews) feed the ingestion workflow.
-- **Groq** (`llama-3.3-70b-versatile`) extracts structured events, filtering irrelevant content.
+- **Groq** (`groq/compound`) extracts structured events, filtering irrelevant content.
 - **Supabase** stores events, prices, news, and market cache.
 - **Client pages** poll Supabase every 5 minutes; **GitHub Actions** re-ingests every 30 minutes (free on any Vercel plan).
 
@@ -64,7 +64,7 @@ flowchart LR
 | Framework | [Next.js 14](https://nextjs.org) (App Router) |
 | Styling | Tailwind CSS + custom `globals.css` design tokens |
 | Database | Supabase (PostgreSQL) with Row-Level Security |
-| AI ingestion | Groq (`llama-3.3-70b-versatile`) |
+| AI ingestion | Groq (`groq/compound`) |
 | News sources | Currents API, Google News RSS, GDELT, NewsData, GNews |
 | Market data | Alpha Vantage, OilPrice API, ExchangeRate API |
 | Fonts | Inter (all text), Space Mono (numbers/prices/times) |

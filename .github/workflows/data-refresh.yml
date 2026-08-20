@@ -9,7 +9,10 @@ name: Data Refresh Cron
 #
 # The four endpoints use per-IP rate limiting (not CRON_SECRET), so
 # scheduled calls are safe. Set repo variable PRODUCTION_URL if the
-# Vercel deployment URL differs from the default.
+# Vercel deployment URL differs from the default. A trailing slash is
+# stripped in-shell so route paths are never double-slashed (a double
+# slash caused a 308 redirect that curl -f treated as success without
+# actually calling the API).
 
 on:
   schedule:
@@ -25,20 +28,14 @@ jobs:
     name: Refresh timeline + news
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://conflictsee.vercel.app' }}
     steps:
       - name: Fetch timeline
-        run: curl -fsS -o /dev/null "$PRODUCTION_URL/api/fetch-timeline"
-        env:
-          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://conflictsee.vercel.app' }}
+        run: curl -fsSL -o /dev/null "${PRODUCTION_URL%/}/api/fetch-timeline"
       - name: Process economics news
-        run: curl -fsS -o /dev/null "$PRODUCTION_URL/api/process-news?type=economics"
-        env:
-          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://conflictsee.vercel.app' }}
+        run: curl -fsSL -o /dev/null "${PRODUCTION_URL%/}/api/process-news?type=economics"
       - name: Process world affairs news
-        run: curl -fsS -o /dev/null "$PRODUCTION_URL/api/process-news?type=world_affairs"
-        env:
-          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://conflictsee.vercel.app' }}
+        run: curl -fsSL -o /dev/null "${PRODUCTION_URL%/}/api/process-news?type=world_affairs"
       - name: Process rumors news
-        run: curl -fsS -o /dev/null "$PRODUCTION_URL/api/process-news?type=rumors"
-        env:
-          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://conflictsee.vercel.app' }}
+        run: curl -fsSL -o /dev/null "${PRODUCTION_URL%/}/api/process-news?type=rumors"
