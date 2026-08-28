@@ -1,10 +1,12 @@
 name: Data Refresh Cron
 
-# Free 30-min ingestion, independent of Vercel's Hobby cron limit.
+# 3-hour ingestion cycle — fits within Groq free-tier budget.
+# groq/compound: 250 RPD per key × 4 keys = 1,000 RPD total.
+# 8 runs/day × ~60 Groq calls per run = ~480 RPD (well within budget).
 # Replaces vercel.json crons (Vercel Hobby allows only 1 cron run/day).
 #
-# Budget (private repo): 48 runs/day ~ 1,440 runs/month, each ~1 min
-# (one job, four curl calls) => ~1,440 min/month, under the 2,000 free
+# Budget (private repo): 8 runs/day ~ 240 runs/month, each ~1 min
+# (one job, four curl calls) => ~240 min/month, under the 2,000 free
 # minutes. If this repo ever goes public, GitHub Actions minutes are free.
 #
 # The four endpoints use per-IP rate limiting (not CRON_SECRET), so
@@ -16,7 +18,7 @@ name: Data Refresh Cron
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0 */3 * * *'
   workflow_dispatch:
 
 concurrency:

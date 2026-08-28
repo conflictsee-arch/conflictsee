@@ -16,7 +16,7 @@ ConflictSee aggregates live news, market prices, and diplomatic/intel data about
 3. **World Affairs** (`/world-affairs`) — country-by-country stances (alignment + intensity), a world stance map, and geopolitical news.
 4. **Rumors & Intel** (`/rumors`) — unverified/OSINT claims, always labeled `UNVERIFIED`, with severity and category filters.
 
-All data is fetched and **AI-processed by Groq** (`groq/compound`) into structured JSON, then stored in Supabase. Pages are client components that read directly from Supabase and auto-refresh every 5 minutes. GitHub Actions re-ingests every 30 minutes (free on any Vercel plan — Hobby allows only 1 Vercel cron/day).
+All data is fetched and **AI-processed by Groq** (`groq/compound`) into structured JSON, then stored in Supabase. Pages are client components that read directly from Supabase and auto-refresh every 5 minutes. GitHub Actions re-ingests every 3 hours (8 runs/day, fits within Groq free-tier budget of 250 RPD × 4 keys — free on any Vercel plan).
 
 ---
 
@@ -33,7 +33,7 @@ All data is fetched and **AI-processed by Groq** (`groq/compound`) into structur
 | Database | Supabase (Postgres, RLS enabled, public SELECT) |
 | AI ingestion | Groq API (`groq-sdk`) — model `groq/compound` |
 | Maps | `@svg-maps/world` |
-| Scheduling | GitHub Actions cron (`.github/workflows/data-refresh.yml`, every 30 min) |
+| Scheduling | GitHub Actions cron (`.github/workflows/data-refresh.yml`, every 3 hours) |
 | Deployment | Vercel (free plan) — **the user deploys manually, never auto-push** |
 
 ---
@@ -303,12 +303,12 @@ SENTRY_TRACING=false
 
 Vercel's Hobby plan allows only **1 cron run/day**, so scheduled ingestion moved to
 **GitHub Actions** (`.github/workflows/data-refresh.yml`) — free on any plan, runs every
-30 min, and calls the production endpoints below. `vercel.json` has **no crons** anymore.
+3 hours, and calls the production endpoints below. `vercel.json` has **no crons** anymore.
 
 ```yaml
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0 */3 * * *'   # every 3 hours
 ```
 
 | Endpoint hit | Purpose |

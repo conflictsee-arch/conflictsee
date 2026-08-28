@@ -35,7 +35,7 @@ Tech stack: Next.js 14 (App Router) · Tailwind CSS · Supabase · Groq (AI inge
 | `/api/backfill-news`       | Gap-aware backfill for `*_news`: skips well-covered ranges, purges placeholder titles, retries on rate limits. Params: `type`, `chunk` (default 7), `min` (default 2), `batch` (items per chunk, default 3, low for budget) |
 | `/api/live-markets`        | Oil/commodities/forex/stock markets → market_cache (30min cache)     |
 
-`vercel.json` crons were **removed** — scheduled ingestion runs via **GitHub Actions** (`.github/workflows/data-refresh.yml`): `/api/fetch-timeline` + 3× `/api/process-news?type=...` every 30 min, free on any Vercel plan (Hobby allows only 1 cron/day). Vercel deploys are manual; Actions is the scheduler.
+`vercel.json` crons were **removed** — scheduled ingestion runs via **GitHub Actions** (`.github/workflows/data-refresh.yml`): `/api/fetch-timeline` + 3× `/api/process-news?type=...` every 3 hours (8 runs/day, fits within Groq free-tier budget of 250 RPD × 4 keys). Free on any Vercel plan (Hobby allows only 1 cron/day). Vercel deploys are manual; Actions is the scheduler.
 
 ## Fonts
 - **Inter** = ALL text everywhere (headings, labels, descriptions, buttons, tags, nav links)

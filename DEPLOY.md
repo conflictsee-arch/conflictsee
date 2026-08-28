@@ -46,18 +46,18 @@ Vercel → project → **Settings → Environment Variables** — add every vari
 
 Vercel → **Deployments** → latest → **Redeploy** (or push to `main` → auto-deploys).
 
-## 4. Verify scheduled ingestion (GitHub Actions, every 30 min)
+## 4. Verify scheduled ingestion (GitHub Actions, every 3 hours)
 
 Scheduled ingestion no longer lives in Vercel (Hobby plan allows only 1 cron run/day).
 It runs as a **GitHub Actions workflow** (`.github/workflows/data-refresh.yml`) every
-30 min, free on any plan. It calls these 4 production endpoints:
+3 hours, free on any plan. It calls these 4 production endpoints:
 
 | Path | Schedule |
 |---|---|
-| `https://<project>.vercel.app/api/fetch-timeline` | `*/30 * * * *` |
-| `https://<project>.vercel.app/api/process-news?type=economics` | `*/30 * * * *` |
-| `https://<project>.vercel.app/api/process-news?type=world_affairs` | `*/30 * * * *` |
-| `https://<project>.vercel.app/api/process-news?type=rumors` | `*/30 * * * *` |
+| `https://<project>.vercel.app/api/fetch-timeline` | `0 */3 * * *` |
+| `https://<project>.vercel.app/api/process-news?type=economics` | `0 */3 * * *` |
+| `https://<project>.vercel.app/api/process-news?type=world_affairs` | `0 */3 * * *` |
+| `https://<project>.vercel.app/api/process-news?type=rumors` | `0 */3 * * *` |
 
 - If the deployment URL differs from `conflictsee.vercel.app`, set a **repo variable**
   `PRODUCTION_URL` (GitHub → Settings → Secrets and variables → Actions → Variables).

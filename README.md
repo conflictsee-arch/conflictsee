@@ -33,7 +33,7 @@ flowchart LR
         E[GNews]
     end
 
-    subgraph Ingestion["AI Ingestion (GitHub Actions cron · 30 min)"]
+    subgraph Ingestion["AI Ingestion (GitHub Actions cron · 3 hours)"]
         F[fetch-timeline / process-news]
         G[Groq · groq/compound]
     end
@@ -44,7 +44,7 @@ flowchart LR
     A & B & C & D & E --> F --> G --> H
     H --> I
     I -- "poll every 5 min" --> H
-    F -- "re-ingest every 30 min" --> H
+    F -- "re-ingest every 3 hours" --> H
 
     subgraph Markets
         J[live-markets]
@@ -55,7 +55,7 @@ flowchart LR
 - **Sources** (Currents, Google News RSS, GDELT, NewsData, GNews) feed the ingestion workflow.
 - **Groq** (`groq/compound`) extracts structured events, filtering irrelevant content.
 - **Supabase** stores events, prices, news, and market cache.
-- **Client pages** poll Supabase every 5 minutes; **GitHub Actions** re-ingests every 30 minutes (free on any Vercel plan).
+- **Client pages** poll Supabase every 5 minutes; **GitHub Actions** re-ingests every 3 hours (free on any Vercel plan).
 
 ## Tech Stack
 
