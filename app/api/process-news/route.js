@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { groqWithPool } from '@/lib/groqClients'
+import { groqWithPool, mapWithConcurrency } from '@/lib/groqClients'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { fetchCurrentsNews } from '@/lib/currentsNews'
 import { fetchGoogleNews } from '@/lib/googleNews'
@@ -156,80 +156,63 @@ export async function GET(request) {
     // structured news.
     await enrichArticlesWithBodies(capped, { limit: 6, minChars: 200 })
 
-    const groq = { chat: { completions: { create: (opts) => groqWithPool[type](opts.messages?.map((m) => m.content).join('\n') || '', opts.max_tokens || 800, opts.temperature ?? 0.1) } } }
     let inserted = 0,
       skipped = cappedSkipped
     const skipReasons = {}
     if (cappedSkipped > 0) skipReasons.over_cap = cappedSkipped
 
-    for (const article of capped) {
-      // NewsData free tier returns ~28-char snippets (useless for analysis) — skip those
-      if (!article.title || (article.content && article.content.length < 40)) {
-        skipReasons.thin = (skipReasons.thin || 0) + 1
+    // NewsData free tier returns ~28-char snippets (useless for analysis) — skip those
+    const analyzable = capped.filter(a => a.title && (!a.content || a.content.length >= 40))
+    skipReasons.thin = (skipReasons.thin || 0) + (capped.length - analyzable.length)
+    skipped += capped.length - analyzable.length
+
+    // Phase 1: parallel Groq extraction (3 concurrent)
+    const extracted = await mapWithConcurrency(analyzable, 3, async (article) => {
+      const prompt = `${PROMPTS[type]}\n\nTitle: ${article.title}\n\nContent: ${article.content}`
+      const raw = await groqWithPool[type](prompt, 800, 0.1)
+      const content = (raw || '').trim()
+      const match = content?.match(/\{[\s\S]*\}/)
+      if (!match) return { status: 'no_json' }
+      const parsed = JSON.parse(match[0])
+      if (parsed.skip) return { status: 'groq_skip' }
+
+      const row = {
+        title: parsed.title,
+        summary: parsed.summary,
+        detail: parsed.detail,
+        category: parsed.category,
+        severity: parsed.severity || 'Medium',
+        source: article.source,
+        source_url: article.url || null,
+        verified: type !== 'rumors',
+        published_at: article.published_at || new Date().toISOString(),
+      }
+      if (type === 'world_affairs') row.countries = parsed.countries || []
+      if (type === 'economics') row.war_impact_note = parsed.war_impact_note || ''
+      if (type === 'rumors') row.verified = false
+      return { status: 'ok', row }
+    })
+
+    // Phase 2: serial upserts (DB writes stay serial)
+    const tableName = TABLE_MAP[type]
+    for (const r of extracted) {
+      if (!r.ok) {
+        logError(ROUTE, 'processing_error', r.error, { table: tableName })
+        skipReasons.other = (skipReasons.other || 0) + 1
         skipped++
         continue
       }
-
-      try {
-        const raw = await groq.chat.completions.create({
-          model: 'groq/compound',
-          temperature: 0.1,
-          max_tokens: 800,
-          messages: [
-            { role: 'system', content: PROMPTS[type] },
-            { role: 'user', content: `Title: ${article.title}\n\nContent: ${article.content}` },
-          ],
-        })
-
-        const content = (raw || '').trim()
-        const match = content?.match(/\{[\s\S]*\}/)
-        if (!match) {
-          skipReasons.no_json = (skipReasons.no_json || 0) + 1
-          skipped++
-          continue
-        }
-
-        const parsed = JSON.parse(match[0])
-        if (parsed.skip) {
-          skipReasons.groq_skip = (skipReasons.groq_skip || 0) + 1
-          skipped++
-          continue
-        }
-
-        const row = {
-          title: parsed.title,
-          summary: parsed.summary,
-          detail: parsed.detail,
-          category: parsed.category,
-          severity: parsed.severity || 'Medium',
-          source: article.source,
-          source_url: article.url || null,
-          verified: type !== 'rumors',
-          published_at: article.published_at || new Date().toISOString(),
-        }
-
-        if (type === 'world_affairs') {
-          row.countries = parsed.countries || []
-        }
-        if (type === 'economics') {
-          row.war_impact_note = parsed.war_impact_note || ''
-        }
-        if (type === 'rumors') {
-          row.verified = false
-        }
-
-        const tableName = TABLE_MAP[type]
-        const { error } = await supabase.from(tableName).upsert(row, { onConflict: 'title' })
-
-        if (!error) inserted++
-        else {
-          logError(ROUTE, 'upsert_error', error, { table: tableName, title: (row.title || '').slice(0, 40) })
-          skipReasons.upsert = (skipReasons.upsert || 0) + 1
-          skipped++
-        }
-      } catch (e) {
-        logError(ROUTE, 'processing_error', e, { table: TABLE_MAP[type], title: (article.title || '').slice(0, 40) })
-        skipReasons.other = (skipReasons.other || 0) + 1
+      const { status, row } = r.value
+      if (status !== 'ok') {
+        skipReasons[status] = (skipReasons[status] || 0) + 1
+        skipped++
+        continue
+      }
+      const { error } = await supabase.from(tableName).upsert(row, { onConflict: 'title' })
+      if (!error) inserted++
+      else {
+        logError(ROUTE, 'upsert_error', error, { table: tableName, title: (row.title || '').slice(0, 40) })
+        skipReasons.upsert = (skipReasons.upsert || 0) + 1
         skipped++
       }
     }

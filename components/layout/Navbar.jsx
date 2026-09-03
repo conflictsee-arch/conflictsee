@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X, AlertTriangle, RefreshCw } from 'lucide-react'
+import { getWarDay } from '@/lib/constants'
 
 const NAV_LINKS = [
   { label: 'Timeline',     href: '/timeline' },
@@ -26,11 +27,7 @@ export default function Navbar() {
   // Dynamic war day count (Feb 28, 2026 = Day 1)
   const [dayCount, setDayCount] = useState(28) // Safe server default
   useEffect(() => {
-    const warStart = new Date('2026-02-28T00:00:00Z')
-    const now = new Date()
-    const d = Math.floor((now - warStart) / (1000 * 60 * 60 * 24)) + 1
-    const finalDay = d > 0 ? d : 1
-    setDayCount(finalDay)
+    setDayCount(getWarDay())
   }, [])
 
   useEffect(() => {
@@ -175,7 +172,7 @@ export default function Navbar() {
       </nav>
 
       {/* ── CONFLICT BANNER ─────────────────── */}
-      <div style={{
+      <div className="conflict-banner" style={{
         width: '100%',
         height: '36px',
         background: '#e8f5ee',

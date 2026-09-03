@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { logInfo, logError } from '@/lib/structuredLog'
+import { getWarDay } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
@@ -312,8 +313,7 @@ export async function GET(request) {
     })
   } catch {}
 
-  const warDay =
-    Math.floor((new Date() - new Date('2026-02-28T00:00:00Z')) / 86400000) + 1
+  const warDay = getWarDay()
 
   // ── PRICE HISTORY (snapshots appended on every run, capped at 48 = 24h) ──
   const HISTORY_MAX = 48

@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Swords, Fuel, TrendingUp } from 'lucide-react'
-
-const WAR_START = new Date('2026-02-28T00:00:00Z')
+import { getWarDay } from '@/lib/constants'
 
 export default function Footer() {
   const [mounted, setMounted] = useState(false)
@@ -14,7 +13,7 @@ export default function Footer() {
   useEffect(() => {
     setMounted(true)
     setYear(String(new Date().getFullYear()))
-    setWarDay(Math.floor((new Date() - WAR_START) / 86400000) + 1)
+    setWarDay(getWarDay())
     fetch('/api/live-markets')
       .then((r) => r.json())
       .then(setMarkets)

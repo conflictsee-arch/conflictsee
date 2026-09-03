@@ -8,12 +8,11 @@ import EnergyTab from '@/app/economics/components/EnergyTab'
 import MarketsTab from '@/app/economics/components/MarketsTab'
 import CurrenciesTab from '@/app/economics/components/CurrenciesTab'
 import NewsTab from '@/app/economics/components/NewsTab'
+import { getWarDay } from '@/lib/constants'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
-const WAR_START = new Date('2026-02-28T00:00:00Z')
-
 const TABS = [
   { id: 'energy',     label: 'Energy',     icon: <Droplet size={15} /> },
   { id: 'markets',    label: 'Markets',    icon: <TrendingUp size={15} /> },
@@ -32,7 +31,7 @@ export default function EconomicsPage() {
   // Mounted guard — never SSR dynamic values
   useEffect(() => {
     setMounted(true)
-    setWarDay(Math.floor((new Date() - WAR_START) / 86400000) + 1)
+    setWarDay(getWarDay())
   }, [])
 
   const loadMarkets = useCallback(async (force = false) => {

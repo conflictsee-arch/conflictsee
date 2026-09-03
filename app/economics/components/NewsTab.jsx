@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { Loader2, RefreshCw, Newspaper, Zap } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useCachedSupabase } from '@/components/ui/useCachedSupabase'
 import SkeletonCard from '@/components/ui/SkeletonCard'
 import SeverityPill from '@/components/ui/SeverityPill'
 import CategoryPill from '@/components/ui/CategoryPill'
@@ -19,15 +20,13 @@ const ECO_CATEGORY_COLORS = {
 }
 
 export default function NewsTab() {
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(true)
   const [cat, setCat] = useState('All')
   const [expanded, setExpanded] = useState(null)
   const [fetching, setFetching] = useState(false)
+  const [fetchError, setFetchError] = useState('')
   const [events, setEvents] = useState([])
 
-  const loadNews = useCallback(async () => {
-    setLoading(true)
+  const fetchNewsFromDb = useCallback(async () => {
     const [newsRes, eventsRes] = await Promise.allSettled([
       supabase
         .from('economics_news')
@@ -40,27 +39,35 @@ export default function NewsTab() {
         .order('timestamp_ist', { ascending: false })
         .limit(200),
     ])
-    setRows((newsRes.status === 'fulfilled' && newsRes.value.data) || [])
     setEvents((eventsRes.status === 'fulfilled' && eventsRes.value.data) || [])
-    setLoading(false)
+    return (newsRes.status === 'fulfilled' && newsRes.value.data) || []
   }, [])
 
-  useEffect(() => {
-    loadNews()
-    const iv = setInterval(loadNews, 300_000)
-    return () => clearInterval(iv)
-  }, [loadNews])
+  // Cached first paint + background refresh every 5 min
+  const { rows, loading, reload: loadNews } = useCachedSupabase(
+    'cs-cache-economics',
+    fetchNewsFromDb,
+    { refreshMs: 300000 }
+  )
+
+  const lastUpdated = rows.length
+    ? rows.reduce((a, b) => (new Date(a.published_at || 0) > new Date(b.published_at || 0) ? a : b)).published_at
+    : null
 
   async function handleFetch() {
     setFetching(true)
+    setFetchError('')
     try {
       const res = await fetch('/api/process-news?type=economics')
-      if (res.status === 429) {
+      if (!res.ok) {
         const j = await res.json().catch(() => ({}))
-        console.warn(j.error || 'Rate limited')
+        throw new Error(j.error || `Fetch failed (${res.status})`)
       }
       await loadNews()
-    } catch {}
+    } catch (e) {
+      setFetchError(e.message || 'Fetch failed — please try again')
+      setTimeout(() => setFetchError(''), 5000)
+    }
     setFetching(false)
   }
 
@@ -125,6 +132,23 @@ export default function NewsTab() {
           }}
         >{fetching ? <><Loader2 size={14} className="spin" /> Fetching…</> : <><RefreshCw size={14} /> Fetch Latest</>}</button>
       </div>
+      {fetchError && (
+        <div style={{
+          background: '#FEF2F2',
+          border: '1px solid #FECACA',
+          borderRadius: '12px',
+          padding: '10px 16px',
+          marginBottom: '16px',
+          fontFamily: 'var(--font-inter), Inter, sans-serif',
+          fontSize: '13px',
+          color: '#B91C1C',
+        }}>⚠️ {fetchError}</div>
+      )}
+      {lastUpdated && (
+        <div style={{ fontFamily: 'var(--font-inter), Inter, sans-serif', fontSize: '12px', color: '#9CA3AF', marginBottom: '12px' }}>
+          Updated {timeAgo(lastUpdated)}
+        </div>
+      )}
 
       {/* Article Cards */}
       {loading ? (

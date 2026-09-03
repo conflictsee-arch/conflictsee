@@ -1,8 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { runTimelineGroqMessages, TIMELINE_SYSTEM_PROMPT } from '@/lib/timelineGroq'
+import { mapWithConcurrency } from '@/lib/groqClients'
 import { fetchTimelineNews } from '@/lib/timelineNews'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { logInfo, logError } from '@/lib/structuredLog'
+import { WAR_START } from '@/lib/constants'
 
 const ROUTE = 'fetch-timeline'
 
@@ -60,60 +62,51 @@ export async function GET(request) {
     let errors = 0
     const results = []
 
-    // 3. Process each article with Groq
-    // Cap articles per run so the endpoint finishes within Vercel's
-    // serverless timeout (groq/compound is slow, ~10-20s per call).
-    // Cron runs every 3h, so 10 newest articles per run is plenty.
+    // 3. Extract events with Groq — 3 concurrent calls so the endpoint
+    // finishes well within Vercel's serverless timeout.
+    // Cap articles per run; cron runs every 3h so 10 newest is plenty.
     const capped = articles.slice(0, 10)
     skipped += articles.length - capped.length
-    for (const article of capped) {
-      // Skip if no content or too thin. Google News RSS titles (content = title)
-      // are meaningful headlines (~20-120 chars) that Groq can summarize;
-      // true junk is < 20 chars.
-      if (!article.content || article.content.length < 20) {
-        console.log(`Skipping thin article: ${article.title?.slice(0, 30)}... (${article.content?.length || 0} chars)`)
+
+    // Phase 1: parallel Groq extraction (thin articles pre-filtered)
+    const extractable = capped.filter(a => a.content && a.content.length >= 20)
+    skipped += capped.length - extractable.length
+
+    const extracted = await mapWithConcurrency(extractable, 3, async (article) => {
+      const raw = await runTimelineGroqMessages([
+        { role: 'system', content: TIMELINE_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: `Article title: ${article.title}\n\nArticle URL: ${article.url || ''}\n\nArticle content: ${article.content.slice(0, 2000)}`,
+        },
+      ])
+      if (!raw) return { status: 'empty' }
+      let parsed
+      try {
+        const jsonMatch = raw.match(/\{[\s\S]*\}/)
+        parsed = JSON.parse(jsonMatch?.[0] || raw)
+      } catch {
+        return { status: 'no_json' }
+      }
+      if (parsed.skip) return { status: 'irrelevant' }
+      if (!parsed.title || !parsed.date || !parsed.bullets || parsed.bullets.length < 2) {
+        return { status: 'invalid' }
+      }
+      return { status: 'ok', parsed, article }
+    })
+
+    // Phase 2: serial dedupe + insert (DB writes stay serial)
+    for (const r of extracted) {
+      if (!r.ok) {
+        errors++
+        logError(ROUTE, 'groq_item_error', r.error, {})
+        continue
+      }
+      const { status, parsed, article } = r.value
+      if (status !== 'ok') {
         skipped++
         continue
       }
-
-      try {
-        const raw = await runTimelineGroqMessages([
-          { role: 'system', content: TIMELINE_SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: `Article title: ${article.title}\n\nArticle URL: ${article.url || ''}\n\nArticle content: ${article.content.slice(0, 2000)}`,
-          },
-        ])
-
-        if (!raw) { 
-          console.log(`Groq returned empty for ${article.title?.slice(0, 30)}...`)
-          skipped++; 
-          continue; 
-        }
-
-        // Parse JSON safely
-        let parsed
-        try {
-          const jsonMatch = raw.match(/\{[\s\S]*\}/)
-          parsed = JSON.parse(jsonMatch?.[0] || raw)
-        } catch {
-          skipped++
-          continue
-        }
-
-        // Skip if Groq says not relevant
-        if (parsed.skip) { 
-          console.log(`Groq irrelevant: ${article.title?.slice(0, 30)}... [${article.source || '?'}] [content ${article.content?.length || 0}c]`)
-          skipped++; 
-          continue; 
-        }
-
-        // Validate required fields and detail quality
-        if (!parsed.title || !parsed.date || !parsed.bullets || parsed.bullets.length < 2) {
-          console.log(`Skipping "${parsed.title || 'Untitled'}": < 2 bullets or missing fields`)
-          skipped++
-          continue
-        }
 
         // Check duplicate
         const titleKey = (parsed.title || '').toLowerCase().slice(0, 40)
@@ -125,7 +118,7 @@ export async function GET(request) {
         existingTitles.add(titleKey)
 
         // 📅 Date Capping & Day Number Calculation
-        const warStart = new Date('2026-02-28T00:00:00Z')
+        const warStart = WAR_START
         let eventDate = new Date(parsed.date + 'T00:00:00Z')
         const today = new Date()
         today.setHours(23, 59, 59, 999)
@@ -172,14 +165,11 @@ export async function GET(request) {
 
         if (error) {
           errors++
+          logError(ROUTE, 'insert_error', error, { title: (parsed.title || '').slice(0, 40) })
         } else {
           inserted++
           results.push(parsed.title)
         }
-      } catch (err) {
-        errors++
-        logError(ROUTE, 'groq_item_error', err, { title: (article.title || '').slice(0, 40) })
-      }
     }
 
     logInfo(ROUTE, 'complete', { articles_fetched: articles.length, inserted, skipped, errors })

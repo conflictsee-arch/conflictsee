@@ -23,9 +23,25 @@ export const metadata = {
     icon: '/favicon.svg',
   },
   openGraph: {
-    title: 'ConflictSee',
-    description: 'Real-time Iran-Israel war intelligence dashboard',
+    title: 'ConflictSee | Real-time Iran-Israel War Intelligence',
+    description: 'Live conflict timeline, economic impact, world stances and AI-verified intel — updated continuously.',
     type: 'website',
+    url: 'https://conflictsee.vercel.app',
+    siteName: 'ConflictSee',
+    images: [
+      {
+        url: '/favicon.svg',
+        width: 64,
+        height: 64,
+        alt: 'ConflictSee logo',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'ConflictSee | Real-time Iran-Israel War Intelligence',
+    description: 'Live conflict timeline, economic impact, world stances and AI-verified intel.',
+    images: ['/favicon.svg'],
   },
 }
 

@@ -4,9 +4,21 @@ import { useState, useEffect, useCallback } from 'react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { supabase } from '@/lib/supabase'
+import { useCachedSupabase } from '@/components/ui/useCachedSupabase'
+import SkeletonCard from '@/components/ui/SkeletonCard'
+import SeverityPill from '@/components/ui/SeverityPill'
+import CategoryPill from '@/components/ui/CategoryPill'
+import { getWarDay } from '@/lib/constants'
 import { RefreshCw, Loader2, AlertTriangle, ShieldAlert, Swords } from 'lucide-react'
 
-const WAR_START = new Date('2026-02-28T00:00:00Z')
+const RUMOR_CATEGORY_COLORS = {
+  intelligence: { bg: '#EFF6FF', color: '#1D4ED8' },
+  nuclear: { bg: '#FAF5FF', color: '#7C3AED' },
+  leadership: { bg: '#FEF2F2', color: '#BE123C' },
+  military: { bg: '#FFF7ED', color: '#C2410C' },
+  diplomatic: { bg: '#ECFDF5', color: '#047857' },
+  'atrocity claims': { bg: '#FDF2F8', color: '#BE185D' },
+}
 
 const RUMOR_CATEGORIES = [
   'All',
@@ -31,80 +43,21 @@ function timeAgo(isoString) {
   return `${Math.floor(h / 24)}d ago`
 }
 
-function Pill({ label, color, bg, border }) {
-  return (
-    <span style={{
-      background: bg,
-      color,
-      border: border ? `1px solid ${border}` : 'none',
-      padding: '2px 10px',
-      borderRadius: '9999px',
-      fontSize: '11px',
-      fontWeight: 600,
-      fontFamily: 'var(--font-inter), Inter, sans-serif',
-      display: 'inline-flex',
-      alignItems: 'center',
-      whiteSpace: 'nowrap',
-    }}>{label}</span>
-  )
-}
-
-function SeverityPill({ severity }) {
-  const s = (severity || 'medium').toString().toLowerCase()
-  const map = {
-    high:   { bg: '#FEF2F2', color: '#DC2626' },
-    medium: { bg: '#FFFBEB', color: '#D97706' },
-    low:    { bg: '#F0FDF4', color: '#16A34A' },
-  }
-  const st = map[s] || map.medium
-  return <Pill label={(s.charAt(0).toUpperCase() + s.slice(1)) || 'Medium'} {...st} />
-}
-
-function CategoryPill({ category }) {
-  const map = {
-    intelligence:      { bg: '#EFF6FF', color: '#1D4ED8' },
-    nuclear:           { bg: '#FAF5FF', color: '#7C3AED' },
-    leadership:        { bg: '#FEF2F2', color: '#BE123C' },
-    military:          { bg: '#FFF7ED', color: '#C2410C' },
-    diplomatic:        { bg: '#ECFDF5', color: '#047857' },
-    'atrocity claims': { bg: '#FDF2F8', color: '#BE185D' },
-  }
-  const key = (category || '').toString().toLowerCase().trim()
-  const st = map[key] || { bg: '#F3F4F6', color: '#374151' }
-  return <Pill label={category || 'General'} {...st} />
-}
-
-function SkeletonCard() {
-  return (
-    <div className="card" style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-        <div style={{ height: '20px', width: '90px', background: '#FECACA', borderRadius: '999px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-        <div style={{ height: '20px', width: '60px', background: '#F3F4F6', borderRadius: '999px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-      </div>
-      <div style={{ height: '16px', width: '75%', background: '#E5E7EB', borderRadius: '6px', marginBottom: '8px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-      <div style={{ height: '12px', width: '90%', background: '#F3F4F6', borderRadius: '4px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-      <div style={{ height: '12px', width: '60%', background: '#F3F4F6', borderRadius: '4px', marginTop: '6px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-    </div>
-  )
-}
-
 export default function RumorsPage() {
   const [mounted, setMounted] = useState(false)
   const [warDay, setWarDay] = useState(28)
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
+  const [fetchError, setFetchError] = useState('')
   const [cat, setCat] = useState('All')
   const [severity, setSeverity] = useState('All')
   const [expanded, setExpanded] = useState(null)
 
   useEffect(() => {
     setMounted(true)
-    setWarDay(Math.floor((new Date() - WAR_START) / 86400000) + 1)
+    setWarDay(getWarDay())
   }, [])
 
-  const loadRumors = useCallback(async () => {
-    setLoading(true)
+  const fetchRumorsFromDb = useCallback(async () => {
     const [newsRes, legacyRes] = await Promise.allSettled([
       supabase.from('rumors_news').select('*').order('published_at', { ascending: false }).limit(100),
       supabase.from('rumors').select('*').order('created_at', { ascending: false }).limit(100),
@@ -139,27 +92,31 @@ export default function RumorsPage() {
     })
 
     merged.sort((a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0))
-    setRows(merged)
-    setLoading(false)
+    return merged
   }, [])
 
-  useEffect(() => {
-    loadRumors()
-    const iv = setInterval(loadRumors, 300000)
-    return () => clearInterval(iv)
-  }, [loadRumors])
+  // Cached first paint + background refresh every 5 min
+  const { rows, loading, reload: loadRumors } = useCachedSupabase(
+    'cs-cache-rumors',
+    fetchRumorsFromDb,
+    { refreshMs: 300000 }
+  )
 
   async function handleFetch() {
     setFetching(true)
+    setFetchError('')
     try {
       const res = await fetch('/api/process-news?type=rumors')
-      if (res.status === 429) {
+      if (!res.ok) {
         const j = await res.json().catch(() => ({}))
-        console.warn(j.error || 'Rate limited')
+        throw new Error(j.error || `Scan failed (${res.status})`)
       }
-    } catch {}
+    } catch (e) {
+      setFetchError(e.message || 'Scan failed — please try again')
+    }
     await loadRumors()
     setFetching(false)
+    if (fetchError) setTimeout(() => setFetchError(''), 5000)
   }
 
   const filtered = rows.filter((r) => {
@@ -232,6 +189,18 @@ export default function RumorsPage() {
             {fetching ? <><Loader2 size={14} className="spin" /> Scanning…</> : <><RefreshCw size={14} /> Scan Latest Intel</>}
           </button>
         </div>
+        {fetchError && (
+          <div style={{
+            background: '#FEF2F2',
+            border: '1px solid #FECACA',
+            borderRadius: '12px',
+            padding: '10px 16px',
+            marginBottom: '16px',
+            fontFamily: 'var(--font-inter), Inter, sans-serif',
+            fontSize: '13px',
+            color: '#B91C1C',
+          }}>⚠️ {fetchError}</div>
+        )}
 
         {/* ── DANGER STAT STRIP ────────────────────────────────────────────── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '20px' }}>
@@ -319,6 +288,11 @@ export default function RumorsPage() {
         {/* ── COUNTER ──────────────────────────────────────────────────────── */}
         <div style={{ fontFamily: 'var(--font-inter)', fontSize: '12px', color: '#9CA3AF', marginBottom: '12px' }}>
           Showing <strong style={{ color: '#374151' }}>{filtered.length}</strong> of {rows.length} reports
+          {rows.length > 0 && mounted && (() => {
+            const latest = rows.reduce((a, b) =>
+              (new Date(a.published_at || 0) > new Date(b.published_at || 0) ? a : b)).published_at
+            return latest ? ` · updated ${timeAgo(latest)}` : ''
+          })()}
         </div>
 
         {/* ── CARDS ────────────────────────────────────────────────────────── */}
@@ -360,7 +334,7 @@ export default function RumorsPage() {
                       fontSize: '10px', fontWeight: 800, fontFamily: 'var(--font-inter)', letterSpacing: '0.5px',
                     }}>UNVERIFIED</span>
                     <SeverityPill severity={row.severity} />
-                    {row.category && <CategoryPill category={row.category} />}
+                    {row.category && <CategoryPill category={row.category} map={RUMOR_CATEGORY_COLORS} />}
                   </div>
 
                   {/* Title */}

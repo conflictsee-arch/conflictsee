@@ -312,6 +312,14 @@ body {
 @media (max-width: 768px) {
   .desktop-nav  { display: none !important; }
   .hamburger-btn { display: flex !important; }
+  /* Conflict banner: allow horizontal scroll instead of clipping on phones */
+  .conflict-banner {
+    overflow-x: auto !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    scrollbar-width: none;
+  }
+  .conflict-banner::-webkit-scrollbar { display: none; }
 }
 
 /* =====================

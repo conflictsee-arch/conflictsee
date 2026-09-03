@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getUniqueCountryStances } from '@/lib/countryStances'
+import { getWarDay } from '@/lib/constants'
 
 const COUNTRIES_TRACKED = getUniqueCountryStances().length
 
@@ -17,7 +18,6 @@ export default function HeroSection() {
   const [dayCount, setDayCount] = useState(28) // Safe server default
   useEffect(() => {
     setMounted(true)
-    const warStart = new Date('2026-02-28T00:00:00Z')
     const update = () => {
       const now = new Date()
       // Time update
@@ -28,8 +28,7 @@ export default function HeroSection() {
       setTime(ist)
 
       // Day update
-      const d = Math.floor((now - warStart) / (1000 * 60 * 60 * 24)) + 1
-      setDayCount(d > 0 ? d : 1)
+      setDayCount(getWarDay(now))
     }
     update()
     const id = setInterval(update, 1000)

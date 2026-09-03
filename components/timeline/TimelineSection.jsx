@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Clock, Calendar, Newspaper, RefreshCw, Loader2 } from 'lucide-react'
+import { Clock, Calendar, Newspaper, RefreshCw, Loader2, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useCachedSupabase } from '@/components/ui/useCachedSupabase'
+import { WAR_START, WAR_START_ISO, getWarDay } from '@/lib/constants'
 
 const TIMEZONES = [
   {
@@ -237,39 +239,36 @@ function ExpandableBullet({ bullet }) {
 }
 
 export default function TimelineSection() {
-  const [events, setEvents] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [activeTimezone, setActiveTimezone] = useState(TIMEZONES[0])
   const [fetching, setFetching] = useState(false)
   const [fetchMsg, setFetchMsg] = useState('')
   const [currentDay, setCurrentDay] = useState(28) // Safe server default
+  const [search, setSearch] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
-  useEffect(() => { 
-    setMounted(true) 
-    const warStart = new Date('2026-02-28T00:00:00Z')
-    const now = new Date()
-    const d = Math.floor((now - warStart) / (1000 * 60 * 60 * 24)) + 1
-    setCurrentDay(d > 0 ? d : 28)
+  useEffect(() => {
+    setMounted(true)
+    setCurrentDay(getWarDay())
   }, [])
 
-  const fetchEvents = useCallback(async () => {
-    setLoadError(false)
-    try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .order('published_at', { ascending: false })
-        .limit(200)
-      if (error) throw error
-      setEvents(data || [])
-    } catch {
-      setLoadError(true)
-    } finally {
-      setLoading(false)
-    }
+  const fetchEventsFromDb = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('published_at', { ascending: false })
+      .limit(200)
+    if (error) throw error
+    return data || []
   }, [])
+
+  // Cached first paint (localStorage) + background refresh every 5 min
+  const { rows: events, loading, loadError, reload: fetchEvents } = useCachedSupabase(
+    'cs-cache-events',
+    fetchEventsFromDb,
+    { refreshMs: 300_000 }
+  )
 
   const handleFetchLatest = async () => {
     setFetching(true)
@@ -292,15 +291,36 @@ export default function TimelineSection() {
     setTimeout(() => setFetchMsg(''), 4000)
   }
 
-  useEffect(() => {
-    fetchEvents()
-    const iv = setInterval(fetchEvents, 300_000)
-    return () => clearInterval(iv)
-  }, [fetchEvents])
+  // Search + date-range filter over loaded events
+  const filteredEvents = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const from = fromDate ? new Date(fromDate + 'T00:00:00Z').getTime() : null
+    const to = toDate ? new Date(toDate + 'T23:59:59Z').getTime() : null
+    return events.filter((event) => {
+      if (from != null || to != null) {
+        const t = new Date(event.published_at).getTime()
+        if (!Number.isFinite(t)) return false
+        if (from != null && t < from) return false
+        if (to != null && t > to) return false
+      }
+      if (!q) return true
+      const hay = [
+        event?.title,
+        event?.headline,
+        event?.source,
+        event?.category,
+        getContextHeaderFromEvent(event),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(q)
+    })
+  }, [events, search, fromDate, toDate])
 
   const groupedEvents = useMemo(() => {
     if (!mounted) return {}
-    return events.reduce((groups, event) => {
+    return filteredEvents.reduce((groups, event) => {
       const dateKey = new Date(event.published_at).toLocaleDateString('en-US', {
         month: 'long',
         day: 'numeric',
@@ -311,7 +331,7 @@ export default function TimelineSection() {
       groups[dateKey].push(event)
       return groups
     }, {})
-  }, [events, mounted])
+  }, [filteredEvents, mounted])
 
   const sortedDays = useMemo(() => {
     const days = Object.keys(groupedEvents)
@@ -358,6 +378,13 @@ export default function TimelineSection() {
             margin: '8px 0 0 0',
           }}>
             Hour-by-hour coverage · Feb 28–Present
+            {mounted && events.length > 0 && (() => {
+              const latest = events.reduce((a, b) =>
+                (new Date(a.published_at || 0) > new Date(b.published_at || 0) ? a : b)).published_at
+              const mins = Math.max(0, Math.round((Date.now() - new Date(latest).getTime()) / 60000))
+              const label = mins < 1 ? 'just now' : mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ago`
+              return ` · updated ${label}`
+            })()}
           </p>
         </div>
 
@@ -402,7 +429,7 @@ export default function TimelineSection() {
             fontWeight: 600,
             whiteSpace: 'nowrap',
           }}>
-            {events.length} Events
+            {filteredEvents.length} Events
           </span>
         </div>
       </div>
@@ -457,6 +484,101 @@ export default function TimelineSection() {
         ))}
       </div>
 
+      {/* ── SEARCH + DATE FILTER ─────────────── */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        flexWrap: 'wrap',
+        marginBottom: '8px',
+        alignItems: 'center',
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          flex: '1 1 220px',
+          background: 'var(--bg-card)',
+          border: '1.5px solid var(--border)',
+          borderRadius: '999px',
+          padding: '7px 14px',
+        }}>
+          <Search size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search events, sources, categories…"
+            style={{
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              width: '100%',
+              fontFamily: 'var(--font-inter), Inter, sans-serif',
+              fontSize: '13px',
+              color: 'var(--text-primary)',
+            }}
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px', padding: 0 }}
+              aria-label="Clear search"
+            >✕</button>
+          )}
+        </div>
+        <input
+          type="date"
+          value={fromDate}
+          min={WAR_START_ISO}
+          onChange={(e) => setFromDate(e.target.value)}
+          style={{
+            border: '1.5px solid var(--border)',
+            borderRadius: '999px',
+            padding: '7px 12px',
+            fontFamily: 'var(--font-inter), Inter, sans-serif',
+            fontSize: '12px',
+            color: 'var(--text-muted)',
+            background: 'var(--bg-card)',
+          }}
+          aria-label="From date"
+        />
+        <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>→</span>
+        <input
+          type="date"
+          value={toDate}
+          min={WAR_START_ISO}
+          onChange={(e) => setToDate(e.target.value)}
+          style={{
+            border: '1.5px solid var(--border)',
+            borderRadius: '999px',
+            padding: '7px 12px',
+            fontFamily: 'var(--font-inter), Inter, sans-serif',
+            fontSize: '12px',
+            color: 'var(--text-muted)',
+            background: 'var(--bg-card)',
+          }}
+          aria-label="To date"
+        />
+        {(search || fromDate || toDate) && (
+          <button
+            onClick={() => { setSearch(''); setFromDate(''); setToDate('') }}
+            style={{
+              border: 'none',
+              background: 'none',
+              cursor: 'pointer',
+              color: 'var(--accent-primary)',
+              fontFamily: 'var(--font-inter), Inter, sans-serif',
+              fontSize: '12px',
+              fontWeight: 600,
+            }}
+          >Clear</button>
+        )}
+      </div>
+      {(search || fromDate || toDate) && (
+        <p style={{ fontFamily: 'var(--font-inter), Inter, sans-serif', fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 12px 2px' }}>
+          {filteredEvents.length} of {events.length} events match
+        </p>
+      )}
+
       {/* ── CONTENT ──────────────────────────── */}
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -474,7 +596,7 @@ export default function TimelineSection() {
             There was an error fetching events. Please try again.
           </p>
           <button
-            onClick={() => { setLoading(true); fetchEvents() }}
+            onClick={() => { fetchEvents() }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',

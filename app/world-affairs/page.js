@@ -4,14 +4,18 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { supabase } from '@/lib/supabase'
+import { useCachedSupabase } from '@/components/ui/useCachedSupabase'
+import SkeletonCard from '@/components/ui/SkeletonCard'
+import Pill from '@/components/ui/Pill'
+import SeverityPill from '@/components/ui/SeverityPill'
+import CategoryPill from '@/components/ui/CategoryPill'
 import {
   getUniqueCountryStances,
   getStanceLookup,
 } from '@/lib/countryStances'
 import WorldStanceMap from '@/components/world-affairs/WorldStanceMap'
+import { getWarDay } from '@/lib/constants'
 import { Swords, RefreshCw, Loader2, Newspaper } from 'lucide-react'
-
-const WAR_START = new Date('2026-02-28T00:00:00Z')
 
 const NEWS_CATEGORIES = [
   'All',
@@ -36,105 +40,68 @@ function timeAgo(isoString) {
   return `${Math.floor(h / 24)}d ago`
 }
 
-function Pill({ label, color, bg, border }) {
-  return (
-    <span style={{
-      background: bg,
-      color,
-      border: border ? `1px solid ${border}` : 'none',
-      padding: '2px 10px',
-      borderRadius: '9999px',
-      fontSize: '11px',
-      fontWeight: 600,
-      fontFamily: 'var(--font-inter), Inter, sans-serif',
-      display: 'inline-flex',
-      alignItems: 'center',
-      whiteSpace: 'nowrap',
-    }}>{label}</span>
-  )
-}
-
-function SeverityPill({ severity }) {
-  const s = (severity || 'medium').toString().toLowerCase()
-  const map = {
-    high:   { bg: '#FEF2F2', color: '#DC2626' },
-    medium: { bg: '#FFFBEB', color: '#D97706' },
-    low:    { bg: '#F0FDF4', color: '#16A34A' },
-  }
-  const st = map[s] || map.medium
-  return <Pill label={s.charAt(0).toUpperCase() + s.slice(1)} {...st} />
-}
-
-function CategoryPill({ category }) {
-  const map = {
-    'great power politics': { bg: '#F5F3FF', color: '#6D28D9' },
-    'nato-europe':          { bg: '#EFF6FF', color: '#1D4ED8' },
-    'diplomacy':            { bg: '#ECFDF5', color: '#047857' },
-    'humanitarian':         { bg: '#FDF2F8', color: '#BE185D' },
-    'lebanon':              { bg: '#FEF3C7', color: '#B45309' },
-    'regional actors':      { bg: '#F0FDF4', color: '#15803D' },
-    'south asia':           { bg: '#FEF2F2', color: '#DC2626' },
-    'islamic world':        { bg: '#F8FAFC', color: '#334155' },
-  }
-  const key = (category || '').toString().toLowerCase()
-  const st = map[key] || { bg: '#F3F4F6', color: '#374151' }
-  return <Pill label={category || 'General'} {...st} />
-}
-
-function SkeletonCard() {
-  return (
-    <div className="card" style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-        <div style={{ height: '20px', width: '80px', background: '#E5E7EB', borderRadius: '999px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-        <div style={{ height: '20px', width: '60px', background: '#F3F4F6', borderRadius: '999px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-      </div>
-      <div style={{ height: '16px', width: '78%', background: '#E5E7EB', borderRadius: '6px', marginBottom: '8px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-      <div style={{ height: '12px', width: '92%', background: '#F3F4F6', borderRadius: '4px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-      <div style={{ height: '12px', width: '55%', background: '#F3F4F6', borderRadius: '4px', marginTop: '6px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-    </div>
-  )
+const WA_CATEGORY_COLORS = {
+  'great power politics': { bg: '#F5F3FF', color: '#6D28D9' },
+  'nato-europe': { bg: '#EFF6FF', color: '#1D4ED8' },
+  diplomacy: { bg: '#ECFDF5', color: '#047857' },
+  humanitarian: { bg: '#FDF2F8', color: '#BE185D' },
+  lebanon: { bg: '#FEF3C7', color: '#B45309' },
+  'regional actors': { bg: '#F0FDF4', color: '#15803D' },
+  'south asia': { bg: '#FEF2F2', color: '#DC2626' },
+  'islamic world': { bg: '#F8FAFC', color: '#334155' },
 }
 
 export default function WorldAffairsPage() {
   const [mounted, setMounted] = useState(false)
   const [warDay, setWarDay] = useState(28)
-  const [news, setNews] = useState([])
-  const [loadingNews, setLoadingNews] = useState(true)
   const [fetching, setFetching] = useState(false)
+  const [fetchError, setFetchError] = useState('')
   const [cat, setCat] = useState('All')
   const [expandedNews, setExpandedNews] = useState(null)
 
   useEffect(() => {
     setMounted(true)
-    setWarDay(Math.floor((new Date() - WAR_START) / 86400000) + 1)
+    setWarDay(getWarDay())
   }, [])
 
   const countries = useMemo(() => getUniqueCountryStances(), [])
   const stanceLookup = useMemo(() => getStanceLookup(), [])
 
-  const loadData = useCallback(async () => {
-    const newsRes = await Promise.allSettled([
-      supabase.from('world_affairs_news').select('*').order('published_at', { ascending: false }).limit(100),
-    ])
-    setNews((newsRes[0].status === 'fulfilled' && newsRes[0].value.data) || [])
-    setLoadingNews(false)
+  const fetchNewsFromDb = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('world_affairs_news')
+      .select('*')
+      .order('published_at', { ascending: false })
+      .limit(100)
+    if (error) throw error
+    return data || []
   }, [])
 
-  useEffect(() => {
-    loadData()
-    const iv = setInterval(loadData, 300000)
-    return () => clearInterval(iv)
-  }, [loadData])
+  // Cached first paint + background refresh every 5 min
+  const { rows: news, loading: loadingNews, reload: loadData } = useCachedSupabase(
+    'cs-cache-world-affairs',
+    fetchNewsFromDb,
+    { refreshMs: 300000 }
+  )
+
+  // Newest item timestamp → "updated X ago" label
+  const lastUpdated = news.length
+    ? news.reduce((a, b) => (new Date(a.published_at || 0) > new Date(b.published_at || 0) ? a : b)).published_at
+    : null
 
   async function handleFetch() {
     setFetching(true)
+    setFetchError('')
     try {
       const res = await fetch('/api/process-news?type=world_affairs')
-      if (res.status === 429) {
+      if (!res.ok) {
         const j = await res.json().catch(() => ({}))
-        console.warn(j.error || 'Rate limited')
+        throw new Error(j.error || `Refresh failed (${res.status})`)
       }
-    } catch {}
+    } catch (e) {
+      setFetchError(e.message || 'Refresh failed — please try again')
+      setTimeout(() => setFetchError(''), 5000)
+    }
     await loadData()
     setFetching(false)
   }
@@ -209,6 +176,18 @@ export default function WorldAffairsPage() {
             {fetching ? <><Loader2 size={14} className="spin" /> Fetching…</> : <><RefreshCw size={14} /> Refresh Intel</>}
           </button>
         </div>
+        {fetchError && (
+          <div style={{
+            background: '#FEF2F2',
+            border: '1px solid #FECACA',
+            borderRadius: '12px',
+            padding: '10px 16px',
+            marginBottom: '16px',
+            fontFamily: 'var(--font-inter), Inter, sans-serif',
+            fontSize: '13px',
+            color: '#B91C1C',
+          }}>⚠️ {fetchError}</div>
+        )}
 
         {/* ── GLOBAL ALIGNMENT MAP ─────────────────────────────────────────── */}
         <div style={{ marginBottom: '24px' }}>
@@ -221,7 +200,10 @@ export default function WorldAffairsPage() {
             <h2 style={{ fontFamily: 'var(--font-inter)', fontWeight: 800, fontSize: '19px', color: '#111827', margin: 0 }}>
               Diplomatic News Feed
             </h2>
-            <span style={{ fontFamily: 'var(--font-inter)', fontSize: '12px', color: '#9CA3AF' }}>AI-curated world affairs developments</span>
+            <span style={{ fontFamily: 'var(--font-inter)', fontSize: '12px', color: '#9CA3AF' }}>
+              AI-curated world affairs developments
+              {lastUpdated && mounted && ` · updated ${timeAgo(lastUpdated)}`}
+            </span>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px', alignItems: 'center' }}>
@@ -276,7 +258,7 @@ export default function WorldAffairsPage() {
                   >
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px', alignItems: 'center' }}>
                       <SeverityPill severity={n.severity} />
-                      {n.category && <CategoryPill category={n.category} />}
+                      {n.category && <CategoryPill category={n.category} map={WA_CATEGORY_COLORS} />}
                       {(n.countries || []).slice(0, 3).map((co) => (
                         <Pill key={co} label={co} bg="#EFF6FF" color="#1D4ED8" />
                       ))}

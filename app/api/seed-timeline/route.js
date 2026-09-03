@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { FULL_TIMELINE } from './full-timeline-data'
 import { groqWithPool } from '@/lib/groqClients'
+import { WAR_START_ISO } from '@/lib/constants'
 
 function getSupabase() {
   return createClient(
@@ -120,6 +121,7 @@ Return ONLY valid JSON array (no markdown, no extra text). Start your response i
         max_tokens: 6000,
         temperature: 0.1,
       }),
+      signal: AbortSignal.timeout(60000),
     })
 
     const data = await res.json()
@@ -235,7 +237,7 @@ Return ONLY valid JSON array (no markdown, no extra text). Start your response i
     //    whole unlocked dataset — a partial/budget-capped run won't
     //    wipe existing coverage.
     const IST_OFFSET_MINUTES = 330
-    const baseDayMs = new Date('2026-02-28T00:00:00Z').getTime()
+    const baseDayMs = new Date(`${WAR_START_ISO}T00:00:00Z`).getTime()
     const getISTDateYYYYMMDD = () => {
       const utcMs = Date.now()
       const istMs = utcMs + IST_OFFSET_MINUTES * 60 * 1000

@@ -2,12 +2,11 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { groqWithPool } from '@/lib/groqClients'
 import { logInfo, logError } from '@/lib/structuredLog'
+import { WAR_START } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
 const ROUTE = 'backfill-news'
-
-const WAR_START = new Date('2026-02-28T00:00:00Z')
 
 const TABLE_MAP = {
   economics: 'economics_news',
