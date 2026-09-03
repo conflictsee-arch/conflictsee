@@ -4,7 +4,7 @@
 
 Built and maintained by [Vyden Co.](https://vyden.co.in)
 
-> **Live demo:** https://conflictsee1.vercel.app
+> **Live demo:** https://conflictsee.vercel.app
 
 ## Contact
 
