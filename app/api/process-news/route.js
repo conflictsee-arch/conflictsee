@@ -145,17 +145,24 @@ export async function GET(request) {
       return true
     })
 
+    // Cap articles per run so the endpoint finishes within Vercel's
+    // serverless timeout (groq/compound is slow, ~10-20s per call).
+    // Cron runs every 3h, so 10 newest articles per run is plenty.
+    const capped = unique.slice(0, 10)
+    const cappedSkipped = unique.length - capped.length
+
     // Enrich thin articles (Google News title-only, Currents short descriptions)
     // with real bodies so the section model has enough content to extract
     // structured news.
-    await enrichArticlesWithBodies(unique, { limit: 10, minChars: 200 })
+    await enrichArticlesWithBodies(capped, { limit: 6, minChars: 200 })
 
     const groq = { chat: { completions: { create: (opts) => groqWithPool[type](opts.messages?.map((m) => m.content).join('\n') || '', opts.max_tokens || 800, opts.temperature ?? 0.1) } } }
     let inserted = 0,
-      skipped = 0
+      skipped = cappedSkipped
     const skipReasons = {}
+    if (cappedSkipped > 0) skipReasons.over_cap = cappedSkipped
 
-    for (const article of unique) {
+    for (const article of capped) {
       // NewsData free tier returns ~28-char snippets (useless for analysis) — skip those
       if (!article.title || (article.content && article.content.length < 40)) {
         skipReasons.thin = (skipReasons.thin || 0) + 1
@@ -227,11 +234,11 @@ export async function GET(request) {
       }
     }
 
-    logInfo(ROUTE, 'complete', { type, articles_fetched: unique.length, inserted, skipped })
+    logInfo(ROUTE, 'complete', { type, articles_fetched: capped.length, inserted, skipped })
     return Response.json({
       type,
       table: TABLE_MAP[type],
-      articles_fetched: unique.length,
+      articles_fetched: capped.length,
       inserted,
       skipped,
       skip_reasons: skipReasons,

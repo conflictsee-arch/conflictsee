@@ -61,7 +61,12 @@ export async function GET(request) {
     const results = []
 
     // 3. Process each article with Groq
-    for (const article of articles) {
+    // Cap articles per run so the endpoint finishes within Vercel's
+    // serverless timeout (groq/compound is slow, ~10-20s per call).
+    // Cron runs every 3h, so 10 newest articles per run is plenty.
+    const capped = articles.slice(0, 10)
+    skipped += articles.length - capped.length
+    for (const article of capped) {
       // Skip if no content or too thin. Google News RSS titles (content = title)
       // are meaningful headlines (~20-120 chars) that Groq can summarize;
       // true junk is < 20 chars.
